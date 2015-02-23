@@ -1,6 +1,5 @@
 ## experimental version for simexing aggregate sgp
 `studentGrowthPercentiles` <-
-<<<<<<< HEAD
   function(panel.data,         ## REQUIRED
            sgp.labels,         ## REQUIRED
            panel.data.vnames,
