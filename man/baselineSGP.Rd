@@ -11,6 +11,7 @@ Utility function/exemplar used to produce student growth percentiles using long 
         years=NULL,
         content_areas=NULL,
         grades=NULL,
+	exclude.years=NULL,
 	sgp.config=NULL,
 	sgp.baseline.config=NULL,
 	sgp.baseline.panel.years=NULL,
@@ -33,6 +34,8 @@ Utility function/exemplar used to produce student growth percentiles using long 
   \item{content_areas}{A vector indicating content area in which to produce baseline referenced student growth percentiles. 
   }
   \item{grades}{A vector indicating which grades to calculate baseline referenced student growth percentiles. 
+  }
+  \item{exclude.years}{A vector indicating which years to exclude from the calculations? 
   }
   \item{sgp.config}{If \code{years}, \code{content_areas}, and \code{grades} are missing, user can directly specify a list containing three vectors: \code{baseline.content.areas}, \code{baseline.panel.years}, and \code{baseline.grade.sequences}. This advanced option is helpful for analysis of non-traditional grade progressions and other special cases. See \code{\link{analyzeSGP}} for use cases.
   }
@@ -88,7 +91,7 @@ DEMO_Baseline_Matrices <- baselineSGP(
 
 SGPstateData[["DEMO"]][["Baseline_splineMatrix"]] <- NULL
 
-sgpData_LONG_4_YEAR <- subset(sgpData_LONG, YEAR!="2012_2013")
+sgpData_LONG_4_YEAR <- subset(sgpData_LONG, YEAR!="2013_2014")
 
 Demonstration_SGP <- prepareSGP(sgpData_LONG_4_YEAR)
 Demonstration_SGP <- baselineSGP(Demonstration_SGP)

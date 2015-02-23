@@ -1,5 +1,6 @@
 `getJSON` <-
 function(tmp.data,
+	sgPlot.sgp_object,
 	state,
 	content_area,
 	year,
@@ -106,39 +107,37 @@ function(tmp.data,
 			return(tmp.list)
 		} ### END interpolate.extend.data
 
-
-		getJSON.percentile_trajectories_Internal <- function(sgPlot.data, percentile.trajectory.values, year, state) {
+		getJSON.percentile_trajectories_Internal <- function(sgPlot.data, sgPlot.sgp_object, percentile.trajectory.values, year, state) {
 
 			.create.path <- function(labels, pieces=c("my.subject", "my.year", "my.extra.label")) {
 				sub(' ', '_', toupper(sub('\\.+$', '', paste(unlist(sapply(labels[pieces], as.character)), collapse="."))))
 			}
 
-			tmp.indices <- seq(which(year==rev(tmp.data$Years)))
-			tmp.df <- data.frame(matrix(c(1, rev(tmp.data$Grades)[tmp.indices], rev(tmp.data$Scale_Scores)[tmp.indices]), nrow=1), stringsAsFactors=FALSE)
+			tmp.indices <- seq(match(year, rev(sgPlot.data[['Years']])))
+			tmp.df <- data.frame(matrix(c(1, rev(tmp.data[['Grades']])[tmp.indices], rev(tmp.data[['Scale_Scores']])[tmp.indices]), nrow=1), stringsAsFactors=FALSE)
 			for (j in seq(to=dim(tmp.df)[2], length=(dim(tmp.df)[2]-1)/2)) {
 				tmp.df[[j]] <- as.numeric(tmp.df[[j]])
 			}
-			gaPlot.sgp_object@SGP$Panel_Data <- tmp.df
-			gaPlot.sgp_object@SGP$SGProjections <- NULL
-			tmp.grades <- as.numeric(tmp.df[1,2:((dim(tmp.df)[2]+1)/2)])
+			sgPlot.sgp_object@SGP$Panel_Data <- tmp.df
 			if (baseline) my.extra.label <- "BASELINE" else my.extra.label <- NULL
 
-			studentGrowthProjections(
-				panel.data=gaPlot.sgp_object@SGP,
+			tmp.studentGrowthProjections <- studentGrowthProjections(
+				panel.data=sgPlot.sgp_object@SGP,
 				sgp.labels=list(my.year=year, my.subject=content_area, my.extra.label=my.extra.label),
-#				grade.progression=
-#				content_area.progression=
-#				year_lags.progression=
+				grade.progression=rev(tmp.data[['Grades']])[tmp.indices],
+				content_area.progression=rev(tmp.data[['Content_Areas']])[tmp.indices],
+				year_lags.progression=diff(as.numeric(sapply(strsplit(rev(tmp.data[['Years']])[tmp.indices], "_"), '[', 2))),
 				grade.projection.sequence=SGPstateData[[state]][["SGP_Configuration"]][["grade.projection.sequence"]][[content_area]],
 				content_area.projection.sequence=SGPstateData[[state]][["SGP_Configuration"]][["content_area.projection.sequence"]][[content_area]],
 				year_lags.projection.sequence=SGPstateData[[state]][["SGP_Configuration"]][["year_lags.projection.sequence"]][[content_area]],
 				projcuts.digits=2,
 				projection.unit="GRADE",
 				percentile.trajectory.values=percentile.trajectory.values,
-				grade.progression=tmp.grades,
-				max.forward.progression.grade=gaPlot.grade_range[2],
-				max.order.for.progression=gaPlot.max.order.for.progression,
 				print.time.taken=FALSE)[["SGProjections"]][[.create.path(list(my.subject=content_area, my.year=year, my.extra.label=my.extra.label))]][,-1]
+
+			tmp.list <- lapply(percentile.trajectory.values, function(x) as.numeric(tmp.studentGrowthProjections[grep(paste("P", x, "_", sep=""), names(tmp.studentGrowthProjections))]))
+			names(tmp.list) <- paste("P", percentile.trajectory.values, sep="")
+			return(tmp.list)
 		} ### END getJSON.percentile_trajectories_Internal
 
 		year.extend <- function(year , add.sub) {
@@ -152,8 +151,8 @@ function(tmp.data,
 
 		get.my.cutscores <- function(cutscores, content_area, year, grade) {
 			tmp.cutscores <- data.table(cutscores[CONTENT_AREA==content_area & GRADE==grade], key="CUTLEVEL")
-			if (!all(is.na(tmp.cutscores$YEAR))) {
-				tmp.cutscore.years <- unique(cutscores$YEAR)
+			if (!all(is.na(tmp.cutscores[['YEAR']]))) {
+				tmp.cutscore.years <- unique(cutscores[['YEAR']])
 				if (year %in% tmp.cutscore.years) {
 					tmp.cutscores <- data.table(tmp.cutscores[YEAR==year], key="CUTLEVEL")
 				} else {
@@ -165,7 +164,7 @@ function(tmp.data,
 					}
 				}
 			}
-			return(c(tmp.cutscores[CUTLEVEL=="LOSS"]$CUTSCORE, tmp.cutscores[!CUTLEVEL %in% c("LOSS", "HOSS")]$CUTSCORE, tmp.cutscores[CUTLEVEL=="HOSS"]$CUTSCORE))
+			return(c(tmp.cutscores[CUTLEVEL=="LOSS"][['CUTSCORES']], tmp.cutscores[!CUTLEVEL %in% c("LOSS", "HOSS")][['CUTSCORES']], tmp.cutscores[CUTLEVEL=="HOSS"][['CUTSCORES']]))
 		}
 
 		### Create grades.content_areas.reported.in.state
@@ -200,50 +199,13 @@ function(tmp.data,
 		### Add in Percentile_Trajectories, SGP_Targets, SGP_Targets_Scale_Scores 
 
 		for (i in years.for.percentile.trajectories) {
-
-			### Percentile_Trajectories
-
 			tmp.index <- which(i==unlist(sapply(tmp.data.extended, '[[', 'Year')))
 			tmp.data.extended[[tmp.index]][['Percentile_Trajectories']] <- getJSON.percentile_trajectories_Internal(
-												sgPlot.data=tmp.data, 
+												sgPlot.data=tmp.data,
+												sgPlot.sgp_object=sgPlot.sgp_object,
 												percentile.trajectory.values=1:99, 
 												year=i, 
 												state=state)
-
-			################################################
-			### HACK
-			################################################
-
-			tmp.matrix <- matrix(NA, nrow=max(which(names(tmp.data.extended)!="Report_Parameters"))-tmp.index+1, ncol=100)
-			tmp.matrix[1,] <- rep(tmp.data.extended[[tmp.index]]$Scale_Score, dim(tmp.matrix)[2])
-			for (k in seq(2, max(which(names(tmp.data.extended)!="Report_Parameters"))-tmp.index+1)) {
-				tmp.matrix[k,] <- round(seq(tmp.data.extended[[tmp.index]]$Scale_Score-20*(k-1), tmp.data.extended[[tmp.index]]$Scale_Score+20*(k-1), length=100), digits=1)
-			}
-			tmp.data.extended[[tmp.index]][['Percentile_Trajectories']] <- as.list(as.data.frame(tmp.matrix))
-
-			### SGP_Targets
-
-			tmp.num.targets <- dim(tmp.matrix)[1]-1
-			tmp.data.extended[[tmp.index]][['SGP_Targets']] <- list(Catch_Up_Keep_Up=round(seq(70, 50, length=tmp.num.targets)), Move_Up_Stay_Up=round(seq(90, 70, length=tmp.num.targets)))
-			if (tmp.data.extended[[tmp.index]][['Achievement_Level']] %in% c("Unsatisfactory", "Partially Proficient")) {
-				tmp.data.extended[[tmp.index]][['SGP_Targets']][['Move_Up_Stay_Up']] <- rep(NA, length=tmp.num.targets)
-			}
-
-			### SGP_Targets_Scale_Scores
-
-			tmp.cuku.list <- tmp.musu.list <- list()
-			for (k in seq_along(tmp.data.extended[[tmp.index]][['SGP_Targets']][['Catch_Up_Keep_Up']])) {
-				tmp.cuku.list[[k]] <- round(tmp.matrix[k+1, tmp.data.extended[[tmp.index]][['SGP_Targets']][['Catch_Up_Keep_Up']][k]])
-				if (!tmp.data.extended[[tmp.index]][['Achievement_Level']] %in% c("Unsatisfactory", "Partially Proficient")) {
-					tmp.musu.list[[k]] <- round(tmp.matrix[k+1, tmp.data.extended[[tmp.index]][['SGP_Targets']][['Move_Up_Stay_Up']][k]])
-				} else {
-					tmp.musu.list[[k]] <- as.numeric(NA)
-				}
-				tmp.data.extended[[tmp.index]][['SGP_Targets_Scale_Scores']] <- list(Catch_Up_Keep_Up=unlist(tmp.cuku.list), Move_Up_Stay_Up=unlist(tmp.musu.list))
-			}
-			##############################################
-			### END HACK
-			##############################################
 		}
 
 
@@ -257,5 +219,4 @@ function(tmp.data,
 		return(tmp.data.extended)	
 
 	} ### END if (data.type=="studentGrowthPlot")
-
 } ### END getJSON

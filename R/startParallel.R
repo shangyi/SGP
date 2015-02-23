@@ -50,7 +50,28 @@ function(
 		if (is.null(parallel.config[['WORKERS']][[process]])) stop(paste(process, "workers must be specified."))
 	}
 	
-	if (all(c("PERCENTILES", "TAUS") %in% names(parallel.config[['WORKERS']]))) stop("Both TAUS and PERCENTILES can not be executed in Parallel at the same time.")
+	Lower_Level_Parallel <- NULL
+	if (all(c("PERCENTILES", "TAUS") %in% names(parallel.config[['WORKERS']]))) {
+		if (as.numeric(parallel.config[['WORKERS']][['PERCENTILES']])==1) {
+			Lower_Level_Parallel <- parallel.config
+		} else stop("Both TAUS and PERCENTILES can not be executed in Parallel at the same time.")
+	}
+	if (all(c("PERCENTILES", "SIMEX") %in% names(parallel.config[['WORKERS']]))) {
+		if (as.numeric(parallel.config[['WORKERS']][['PERCENTILES']])==1) {
+			Lower_Level_Parallel <- parallel.config
+		} else stop("Both SIMEX and PERCENTILES can not be executed in Parallel at the same time.")
+	}
+	
+	if (all(c("BASELINE_PERCENTILES", "TAUS") %in% names(parallel.config[['WORKERS']]))) {
+		if (as.numeric(parallel.config[['WORKERS']][['BASELINE_PERCENTILES']])==1) {
+			Lower_Level_Parallel <- parallel.config
+		} else stop("Both TAUS and BASELINE_PERCENTILES can not be executed in Parallel at the same time.")
+	}
+	if (all(c("BASELINE_PERCENTILES", "SIMEX") %in% names(parallel.config[['WORKERS']]))) {
+		if (as.numeric(parallel.config[['WORKERS']][['BASELINE_PERCENTILES']])==1) {
+			Lower_Level_Parallel <- parallel.config
+		} else stop("Both SIMEX and BASELINE_PERCENTILES can not be executed in Parallel at the same time.")
+	}
 
 	###  Basic configuration
 	
@@ -66,8 +87,8 @@ function(
 		# }
 
 		if (parallel.config[['TYPE']]=="doParallel") { 
-			if (.Platform$OS.type == "unix" & is.null(par.type)) par.type <- 'MULTICORE' 
-			if (.Platform$OS.type != "unix" & is.null(par.type)) par.type <- 'SNOW'
+			if (.Platform$OS.type == "unix" & par.type == "OTHER") par.type <- 'MULTICORE' 
+			if (.Platform$OS.type != "unix" & par.type == "OTHER") par.type <- 'SNOW'
 			if (par.type == 'MULTICORE' & is.null(parallel.config[['OPTIONS']][["preschedule"]])) {
 				if (is.list(parallel.config[['OPTIONS']])) {
 					parallel.config[['OPTIONS']][["preschedule"]]=FALSE
@@ -91,19 +112,19 @@ function(
 		# if (!is.null(parallel.config[['TYPE']]) && parallel.config[['TYPE']] == 'MPI') require(snow)  #  Don't think this is a problem any more... 08/03/12
 		suppressPackageStartupMessages(require(parallel))
 		if (!is.null(parallel.config[['TYPE']])) {
-			if (!parallel.config[['TYPE']] %in% c('SOCK', 'MPI')) {
-				stop("The 'snow' package will be used when 'parallel.config$TYPE' is specified and BACKEND=='PARALLEL'.  List element must be 'SOCK' or 'MPI'.")
+			if (!parallel.config[['TYPE']] %in% c('SOCK', 'PSOCK', 'MPI')) {
+				stop("The 'snow' package will be used when 'parallel.config$TYPE' is specified and BACKEND=='PARALLEL'.  List element must be 'SOCK' ('PSOCK') or 'MPI'.")
 			}
 			par.type <- 'SNOW'
 		} else {
 			if (.Platform$OS.type == "unix") par.type <- 'MULTICORE' 
-			if (.Platform$OS.type != "unix") par.type <- 'SNOW'; parallel.config[['TYPE']] <- 'SOCK'
+			if (.Platform$OS.type != "unix") par.type <- 'SNOW'; parallel.config[['TYPE']] <- 'PSOCK'
 		}
 	}
 	
 	if (par.type == 'SNOW') {
-		if (is.null(parallel.config[['TYPE']])) stop("The 'parallel.config$TYPE' must be specified ('SOCK' or 'MPI')")
-		if (!parallel.config[['TYPE']] %in% c('SOCK','MPI')) stop("The 'parallel.config$TYPE' must be 'SOCK' or 'MPI'")
+		if (is.null(parallel.config[['TYPE']])) stop("The 'parallel.config$TYPE' must be specified ('PSOCK' or 'MPI')")
+		if (!parallel.config[['TYPE']] %in% c('PSOCK','MPI', 'doParallel')) stop("The 'parallel.config$TYPE' must be 'PSOCK', 'MPI' or 'doParallel'.")
 	}
 
 
@@ -169,14 +190,13 @@ function(
 	###
 	
 	if (toupper(parallel.config[['BACKEND']]) == 'FOREACH') {
-		par.type='FOREACH'
 		if (parallel.config[['TYPE']]=="NA") {
 			registerDoSEQ() # prevents warning message
-			return(list(foreach.options=foreach.options, par.type=par.type))
+			return(list(foreach.options=foreach.options, par.type=par.type, TAUS.LIST=TAUS.LIST))
 		}
 		# if (parallel.config[['TYPE']]=="doMC") {
 			# registerDoMC(workers)
-			# return(list(foreach.options=foreach.options, par.type=par.type))
+			# return(list(foreach.options=foreach.options, par.type=par.type, TAUS.LIST=TAUS.LIST))
 		# }
 		# if (parallel.config[['TYPE']]=='doMPI') {
 			# doPar.cl <- startMPIcluster(count=workers)
@@ -194,12 +214,14 @@ function(
 			# registerDoSNOW(doPar.cl)
 			# return(list(doPar.cl=doPar.cl, foreach.options=foreach.options, par.type=par.type))
 		# }
+		if(!is.null(parallel.config[['SNOW_TEST']])) par.type <- 'SNOW' # To test SNOW on Linux
 		if (parallel.config[['TYPE']]=="doParallel") {
 			if (par.type == 'SNOW') {
-				doPar.cl <- makeCluster(workers, type='SOCK')
+				doPar.cl <- makePSOCKcluster(workers)
 				registerDoParallel(doPar.cl)
 				clusterEvalQ(doPar.cl, library(SGP))
-				return(list(doPar.cl=doPar.cl, foreach.options=foreach.options, par.type=par.type))
+				# foreach.options <- list(attachExportEnv=TRUE)
+				return(list(doPar.cl=doPar.cl, foreach.options=foreach.options, par.type=par.type, TAUS.LIST=TAUS.LIST))
 			} else {
 				registerDoParallel(workers)
 				return(list(foreach.options=foreach.options, par.type=par.type, TAUS.LIST=TAUS.LIST))
@@ -217,6 +239,6 @@ function(
 	}
 
 	if (par.type=='MULTICORE') {
-		return(list(workers=workers, par.type=par.type, TAUS.LIST=TAUS.LIST))
+		return(list(workers=workers, par.type=par.type, TAUS.LIST=TAUS.LIST, Lower_Level_Parallel=Lower_Level_Parallel))
 	}
 }

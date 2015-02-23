@@ -1,6 +1,7 @@
 `updateSGP` <- 
 function(what_sgp_object=NULL,
 	with_sgp_data_LONG=NULL,
+	with_sgp_data_INSTRUCTOR_NUMBER=NULL,
 	state=NULL,
 	steps=c("prepareSGP", "analyzeSGP", "combineSGP", "summarizeSGP", "visualizeSGP", "outputSGP"),
 	years=NULL,
@@ -21,11 +22,13 @@ function(what_sgp_object=NULL,
 	sgp.target.scale.scores=FALSE,
 	sgp.target.scale.scores.only=FALSE,
 	overwrite.existing.data=FALSE,
+	update.old.data.with.new=TRUE,
 	sgPlot.demo.report=TRUE,
 	outputSGP.output.type=c("LONG_Data", "LONG_FINAL_YEAR_Data", "WIDE_Data", "INSTRUCTOR_Data"),
 	sgp.config=NULL,
 	goodness.of.fit.print=TRUE,
 	parallel.config=NULL,
+	sgp.sqlite = NULL,
 	...) {
 
 		started.at <- proc.time()
@@ -103,7 +106,14 @@ function(what_sgp_object=NULL,
 		what_sgp_object@SGP[['SGPercentiles']][grep(paste(tmp.content_areas.years, collapse="|"), names(what_sgp_object@SGP[['SGPercentiles']]))] <- NULL
 		what_sgp_object@SGP[['SGProjections']][grep(paste(tmp.content_areas.years, collapse="|"), names(what_sgp_object@SGP[['SGProjections']]))] <- NULL
 		what_sgp_object@SGP[['Simulated_SGPs']][grep(paste(tmp.content_areas.years, collapse="|"), names(what_sgp_object@SGP[['Simulated_SGPs']]))] <- NULL
-		
+
+		### Add in INSTRUCTOR_NUMBER data is supplied
+
+		if (!is.null(with_sgp_data_INSTRUCTOR_NUMBER)) {
+			what_sgp_object@Data_Supplementary[['INSTRUCTOR_NUMBER']] <- 
+				data.table(rbind.fill(what_sgp_object@Data_Supplementary[['INSTRUCTOR_NUMBER']], with_sgp_data_INSTRUCTOR_NUMBER),
+					key=c("ID", "CONTENT_AREA", "YEAR"))
+		}		
 
 		### Update results
 
@@ -151,9 +161,11 @@ function(what_sgp_object=NULL,
 		tmp_sgp_object <- prepareSGP(with_sgp_data_LONG, state=state, create.additional.variables=FALSE)
 		if(!is.null(sgp.config)) years <- unique(sapply(lapply(sgp.config, '[[', 'sgp.panel.years'), tail, 1))
 		if(is.null(years)) update.years <- sort(unique(tmp_sgp_object@Data$YEAR)) else update.years <- years
+		if(is.null(content_areas)) update.content_areas <- sort(unique(tmp_sgp_object@Data$CONTENT_AREA)) else update.content_areas <- content_areas
+		if(is.null(grades)) update.grades <- sort(unique(tmp_sgp_object@Data$GRADE)) else update.grades <- grades
 
 		if (overwrite.existing.data) {
-				what_sgp_object@Data <- as.data.table(rbind.fill(what_sgp_object@Data[YEAR!=update.years], tmp_sgp_object@Data))
+				what_sgp_object@Data <- as.data.table(rbind.fill(what_sgp_object@Data[which(YEAR!=update.years)], tmp_sgp_object@Data))
 				what_sgp_object@SGP[['Goodness_of_Fit']][grep(update.years, names(what_sgp_object@SGP[['Goodness_of_Fit']]))] <- NULL
 				what_sgp_object@SGP[['SGPercentiles']][grep(update.years, names(what_sgp_object@SGP[['SGPercentiles']]))] <- NULL
 				what_sgp_object@SGP[['SGProjections']][grep(update.years, names(what_sgp_object@SGP[['SGProjections']]))] <- NULL
@@ -171,8 +183,8 @@ function(what_sgp_object=NULL,
 						what_sgp_object, 
 						steps=steps, 
 						years=update.years, 
-						content_areas=content_areas,
-						grades=grades,
+						content_areas=update.content_areas,
+						grades=update.grades,
 						state=state, 
 						sgp.percentiles=sgp.percentiles,
 						sgp.projections=sgp.projections,
@@ -218,8 +230,8 @@ function(what_sgp_object=NULL,
 				tmp.sgp_object.update <- analyzeSGP(
 							tmp.sgp_object.update,
 							years=update.years, 
-							content_areas=content_areas,
-							grades=grades,
+							content_areas=update.content_areas,
+							grades=update.grades,
 							state=state, 
 							sgp.percentiles=sgp.percentiles,
 							sgp.projections=sgp.projections,
@@ -234,6 +246,7 @@ function(what_sgp_object=NULL,
 							sgp.config=sgp.config,
 							parallel.config=parallel.config,
 							goodness.of.fit.print=FALSE,
+							sgp.sqlite= sgp.sqlite,
 							...)
 							
 				if ("combineSGP" %in% steps) {
@@ -282,6 +295,15 @@ function(what_sgp_object=NULL,
 						sgp.target.scale.scores.only=sgp.target.scale.scores.only)
 				}
 
+
+				### Add in INSTRUCTOR_NUMBER data for summarizeSGP if supplied
+
+				if (!is.null(with_sgp_data_INSTRUCTOR_NUMBER)) {
+					what_sgp_object@Data_Supplementary[['INSTRUCTOR_NUMBER']] <- 
+						data.table(rbind.fill(what_sgp_object@Data_Supplementary[['INSTRUCTOR_NUMBER']], with_sgp_data_INSTRUCTOR_NUMBER),
+							key=c("ID", "CONTENT_AREA", "YEAR"))
+				}		
+
 				if ("summarizeSGP" %in% steps) what_sgp_object <- summarizeSGP(what_sgp_object, state=state, parallel.config=parallel.config)
 				if ("visualizeSGP" %in% steps) visualizeSGP(what_sgp_object, state=state, sgPlot.demo.report=sgPlot.demo.report)
 				if ("outputSGP" %in% steps) outputSGP(what_sgp_object, state=state, output.type=outputSGP.output.type)
@@ -299,11 +321,23 @@ function(what_sgp_object=NULL,
 				message(paste("Finished updateSGP", date(), "in", timetaken(started.at), "\n"))
 				return(what_sgp_object)
 			} else {
-				what_sgp_object@Data <- data.table(rbind.fill(what_sgp_object@Data, tmp_sgp_object@Data), key=getKey(what_sgp_object@Data))
+				if (update.old.data.with.new) {
+					what_sgp_object@Data <- data.table(rbind.fill(what_sgp_object@Data, tmp_sgp_object@Data), key=getKey(what_sgp_object@Data))
+				} else {
+					what_sgp_object@Data <- data.table(rbind.fill(what_sgp_object@Data[which(ID %in% tmp_sgp_object@Data$ID)], tmp_sgp_object@Data), key=getKey(what_sgp_object@Data))
+				}
 
 				if ("HIGH_NEED_STATUS" %in% names(what_sgp_object@Data)) {
 					what_sgp_object@Data[['HIGH_NEED_STATUS']] <- NULL
 					what_sgp_object <- suppressMessages(prepareSGP(what_sgp_object, state=state))
+				}
+
+				### Add in INSTRUCTOR_NUMBER data for summarizeSGP if supplied
+
+				if (!is.null(with_sgp_data_INSTRUCTOR_NUMBER)) {
+					what_sgp_object@Data_Supplementary[['INSTRUCTOR_NUMBER']] <- 
+						data.table(rbind.fill(what_sgp_object@Data_Supplementary[['INSTRUCTOR_NUMBER']], with_sgp_data_INSTRUCTOR_NUMBER),
+							key=c("ID", "CONTENT_AREA", "YEAR"))
 				}
 
 				### abcSGP
@@ -312,8 +346,8 @@ function(what_sgp_object=NULL,
 							what_sgp_object, 
 							steps=steps, 
 							years=update.years, 
-							content_areas=content_areas,
-							grades=grades,
+							content_areas=update.content_areas,
+							grades=update.grades,
 							state=state, 
 							sgp.percentiles=sgp.percentiles,
 							sgp.projections=sgp.projections,

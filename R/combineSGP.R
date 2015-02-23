@@ -22,7 +22,7 @@ function(
 	message(paste("Started combineSGP", date()))
 
 	ID <- CONTENT_AREA <- YEAR <- GRADE <- YEAR_INTEGER_TMP <- ACHIEVEMENT_LEVEL <- CATCH_UP_KEEP_UP_STATUS_INITIAL <- MOVE_UP_STAY_UP_STATUS_INITIAL <- VALID_CASE <- NULL
-	MOVE_UP_STAY_UP_STATUS <- CATCH_UP_KEEP_UP_STATUS <- ACHIEVEMENT_LEVEL_PRIOR <- target.type <- NULL
+	MOVE_UP_STAY_UP_STATUS <- CATCH_UP_KEEP_UP_STATUS <- ACHIEVEMENT_LEVEL_PRIOR <- target.type <- SGP_PROJECTION_GROUP <- NULL
 
 	tmp.messages <- NULL
 
@@ -33,16 +33,16 @@ function(
 
 	### Create state (if missing) from sgp_object (if possible)
 
-        if (is.null(state)) {
-                tmp.name <- toupper(gsub("_", " ", deparse(substitute(sgp_object))))
-                state <- getStateAbbreviation(tmp.name, "combineSGP")
-        }
+	if (is.null(state)) {
+		tmp.name <- toupper(gsub("_", " ", deparse(substitute(sgp_object))))
+		state <- getStateAbbreviation(tmp.name, "combineSGP")
+	}
 
 	if (is.null(state)) {
 		tmp.name <- toupper(gsub("_", " ", deparse(substitute(sgp_object))))
-                tmp.name.position <- sapply(c(state.name, "AOB", "DEMONSTRATION"), function(x) regexpr(toupper(x), tmp.name))
-                if (any(tmp.name.position!=-1)) {
-                        state <- c(state.abb, "AOB", "DEMO")[which(names(sort(tmp.name.position[tmp.name.position!=-1])[1])==c(state.name, "AOB", "DEMONSTRATION"))]
+		tmp.name.position <- sapply(c(state.name, "AOB", "DEMONSTRATION"), function(x) regexpr(toupper(x), tmp.name))
+		if (any(tmp.name.position!=-1)) {
+			state <- c(state.abb, "AOB", "DEMO")[which(names(sort(tmp.name.position[tmp.name.position!=-1])[1])==c(state.name, "AOB", "DEMONSTRATION"))]
 		} else {
 			tmp.messages <- c(tmp.messages, "\tNOTE: argument 'state' required for target SGP calculation. Target SGPs will not be calculated.\n")
 			sgp.projections.lagged <- sgp.projections.lagged.baseline <- FALSE
@@ -130,27 +130,33 @@ function(
 
 	"%w/o%" <- function(x,y) x[!x %in% y]
 
+	getTargetData <- function(tmp.target.data, projection_group.iter, tmp.target.level.names) {
+		tmp.data <- tmp.target.data[SGP_PROJECTION_GROUP==projection_group.iter, c("ID", "CONTENT_AREA", "YEAR", tmp.target.level.names), with=FALSE]
+		return(tmp.data[apply(tmp.data[,tmp.target.level.names, with=FALSE],1,function(x)any(!is.na(x)))])
+	}
 
+	
 	############################################################################
 	### Check update.all.years
 	############################################################################
 
 	if (update.all.years) {
-		variables.to.null.out <- c("SGP", "SGP_SIMEX", "SGP_LEVEL", "SGP_STANDARD_ERROR", "SCALE_SCORE_PRIOR", "SCALE_SCORE_PRIOR_STANDARDIZED", "SGP_BASELINE", "SGP_LEVEL_BASELINE", 
-						"SGP_TARGET", "SGP_TARGET_MU", "SGP_TARGET_MU_BASELINE", "SGP_TARGET_MOVE_UP_STAY_UP", "SGP_TARGET_MOVE_UP_STAY_UP_BASELINE", "ACHIEVEMENT_LEVEL_PRIOR", 
-						"CATCH_UP_KEEP_UP_STATUS_INITIAL", "SGP_TARGET_BASELINE", "CATCH_UP_KEEP_UP_STATUS", "CATCH_UP_KEEP_UP_STATUS_BASELINE",
-						"MOVE_UP_STATUS", "MOVE_UP_STAY_UP_STATUS", "MOVE_UP_STAY_UP_STATUS_BASELINE",
-						"SGP_NORM_GROUP", "SGP_NORM_GROUP_BASELINE", "SGP_BASELINE_STANDARD_ERROR", "SGP_NORM_GROUP_SCALE_SCORES", "SGP_NORM_GROUP_BASELINE_SCALE_SCORES",
-						grep("SGP_ORDER", names(slot.data), value=TRUE), grep("SGP_BASELINE_ORDER", names(slot.data), value=TRUE),
-						grep("PERCENTILE_CUT", names(slot.data), value=TRUE), grep("CONFIDENCE_BOUND", names(slot.data), value=TRUE),
-						paste("SGP_TARGET", max.sgp.target.years.forward, projection.unit.label, sep="_"), 
-						paste("SGP_TARGET_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, sep="_"), 
-						paste("SGP_TARGET", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"), 
-						paste("SGP_TARGET_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"), 
-						paste("SGP_TARGET_BASELINE", max.sgp.target.years.forward, projection.unit.label, sep="_"), 
-						paste("SGP_TARGET_BASELINE_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, sep="_"),
-						paste("SGP_TARGET_BASELINE", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"), 
-						paste("SGP_TARGET_BASELINE_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"))
+		variables.to.null.out <- c(
+			"SGP", "SGP_SIMEX", "SGP_LEVEL", "SGP_STANDARD_ERROR", "SCALE_SCORE_PRIOR", "SCALE_SCORE_PRIOR_STANDARDIZED", "SGP_BASELINE", "SGP_LEVEL_BASELINE", 
+			"SGP_TARGET", "SGP_TARGET_MU", "SGP_TARGET_MU_BASELINE", "SGP_TARGET_MOVE_UP_STAY_UP", "SGP_TARGET_MOVE_UP_STAY_UP_BASELINE", "ACHIEVEMENT_LEVEL_PRIOR", 
+			"CATCH_UP_KEEP_UP_STATUS_INITIAL", "SGP_TARGET_BASELINE", "CATCH_UP_KEEP_UP_STATUS", "CATCH_UP_KEEP_UP_STATUS_BASELINE",
+			"MOVE_UP_STATUS", "MOVE_UP_STAY_UP_STATUS", "MOVE_UP_STAY_UP_STATUS_BASELINE",
+			"SGP_NORM_GROUP", "SGP_NORM_GROUP_BASELINE", "SGP_BASELINE_STANDARD_ERROR", "SGP_NORM_GROUP_SCALE_SCORES", "SGP_NORM_GROUP_BASELINE_SCALE_SCORES",
+			grep("SGP_ORDER", names(slot.data), value=TRUE), grep("SGP_BASELINE_ORDER", names(slot.data), value=TRUE),
+			grep("PERCENTILE_CUT", names(slot.data), value=TRUE), grep("CONFIDENCE_BOUND", names(slot.data), value=TRUE),
+			paste("SGP_TARGET", max.sgp.target.years.forward, projection.unit.label, sep="_"), 
+			paste("SGP_TARGET_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, sep="_"), 
+			paste("SGP_TARGET", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"), 
+			paste("SGP_TARGET_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"), 
+			paste("SGP_TARGET_BASELINE", max.sgp.target.years.forward, projection.unit.label, sep="_"), 
+			paste("SGP_TARGET_BASELINE_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, sep="_"),
+			paste("SGP_TARGET_BASELINE", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"), 
+			paste("SGP_TARGET_BASELINE_MOVE_UP_STAY_UP", max.sgp.target.years.forward, projection.unit.label, "CURRENT", sep="_"))
 
 		for (tmp.variables.to.null.out in intersect(names(slot.data), variables.to.null.out)) {
 			slot.data[,tmp.variables.to.null.out:=NULL, with=FALSE]
@@ -231,7 +237,7 @@ function(
 			tmp.data <- getPreferredSGP(tmp.data, state, type="BASELINE")
 		}
 
-		variables.to.merge <- names(tmp.data) %w/o% c(key(slot.data), "SCALE_SCORE_PRIOR", "SCALE_SCORE_PRIOR_STANDARDIZED")
+		variables.to.merge <- names(tmp.data) %w/o% key(slot.data)
 		tmp.index <- slot.data[tmp.data[,key(slot.data), with=FALSE], which=TRUE]
 		slot.data[tmp.index, variables.to.merge := tmp.data[, variables.to.merge, with=FALSE], with=FALSE, nomatch=0]
 
@@ -246,16 +252,16 @@ function(
 
 
 	if (length(getPercentileTableNames(sgp_object, content_areas, state, years, "sgp.projections")) == 0 & sgp.projections) {
-		 tmp.messages <- c(tmp.messages, "\tNOTE: No SGP projections available in SGP slot. No current year student growth projection targets will be produced.\n")
-		 sgp.projections <- FALSE; 
+		tmp.messages <- c(tmp.messages, "\tNOTE: No SGP projections available in SGP slot. No current year student growth projection targets will be produced.\n")
+		sgp.projections <- FALSE; 
 	}
 	if (length(getPercentileTableNames(sgp_object, content_areas, state, years, "sgp.projections.baseline")) == 0 & sgp.projections.baseline) {
-		 tmp.messages <- c(tmp.messages, "\tNOTE: No SGP baseline projections available in SGP slot. No current year baseline student growth projection targets will be produced.\n")
-		 sgp.projections.baseline <- FALSE; 
+		tmp.messages <- c(tmp.messages, "\tNOTE: No SGP baseline projections available in SGP slot. No current year baseline student growth projection targets will be produced.\n")
+		sgp.projections.baseline <- FALSE; 
 	}
 	if (length(getPercentileTableNames(sgp_object, content_areas, state, years, "sgp.projections.lagged")) == 0 & sgp.projections.lagged) {
-		 tmp.messages <- c(tmp.messages, "\tNOTE: No SGP lagged projections available in SGP slot. No student growth projection targets will be produced.\n")
-		 sgp.projections.lagged <- FALSE; 
+		tmp.messages <- c(tmp.messages, "\tNOTE: No SGP lagged projections available in SGP slot. No student growth projection targets will be produced.\n")
+		sgp.projections.lagged <- FALSE; 
 	}
 	if (length(getPercentileTableNames(sgp_object, content_areas, state, years, "sgp.projections.lagged.baseline")) == 0 & sgp.projections.lagged.baseline) {
 		tmp.messages <- c(tmp.messages, "\tNOTE: No SGP lagged baseline projections available in SGP slot. No baseline referenced student growth projection targets will be produced.\n")
@@ -273,11 +279,18 @@ function(
 		for (target.type.iter in target.args[['target.type']]) {
 			for (target.level.iter in target.args[['target.level']]) {
 				tmp.data <- getTargetSGP(sgp_object, content_areas, state, years, target.type.iter, target.level.iter, max.sgp.target.years.forward)
-
+				if (any(duplicated(tmp.data))) {
+					duplicated.projections.tf <- TRUE
+					tmp.data <- getPreferredSGP(tmp.data, state, type="TARGET")
+				} else duplicated.projections.tf <- FALSE
 				variables.to.merge <- names(tmp.data) %w/o% key(slot.data)
 				tmp.index <- slot.data[tmp.data[,intersect(key(slot.data), names(tmp.data)), with=FALSE], which=TRUE]
 				slot.data[tmp.index, variables.to.merge := tmp.data[, variables.to.merge, with=FALSE], with=FALSE, nomatch=0]
 			}
+		}
+		if (duplicated.projections.tf) {
+			tmp.messages <- c(tmp.messages, paste(
+				"\tNOTE: Multiple Projections exist for individual students. Unique SGP Targets will be created using SGP Progression Preference Table for ", state, ".\n", sep=""))
 		}
 
 		### SGP_TARGET_CONTENT_AREA calculation
@@ -390,24 +403,33 @@ function(
 		tmp.target.list <- list()
 		for (target.type.iter in target.args[['sgp.target.scale.scores.types']]) {
 			for (target.level.iter in target.args[['target.level']]) {
-				tmp.target.list[[paste(target.type.iter, target.level.iter)]] <- 
-					getTargetSGP(sgp_object, content_areas, state, years, target.type.iter, target.level.iter, max.sgp.target.years.forward, return.lagged.status=FALSE)
+				tmp.target.list[[paste(target.type.iter, target.level.iter)]] <-
+					data.table(getTargetSGP(sgp_object, content_areas, state, years, target.type.iter, target.level.iter, max.sgp.target.years.forward, return.lagged.status=FALSE),
+						key=c(getKey(sgp_object), "SGP_PROJECTION_GROUP"))
 			}
 		}
-		tmp.target.data <- data.table(Reduce(function(x, y) merge.data.frame(x, y, all=T), tmp.target.list, accumulate=FALSE), key=c("VALID_CASE", "CONTENT_AREA", "YEAR", "ID"))
+		tmp.target.data <- data.table(Reduce(function(x, y) merge(x, y, all=TRUE), tmp.target.list[!sapply(tmp.target.list, function(x) dim(x)[1]==0)], 
+			accumulate=FALSE), key=c("VALID_CASE", "CONTENT_AREA", "YEAR", "ID"))
 
-		for (target.type.iter in target.args[['sgp.target.scale.scores.types']]) {
-			tmp.target.level.names <- 
-				as.character(sapply(target.args[['target.level']], function(x) getTargetName(target.type.iter, x, max.sgp.target.years.forward, "SGP_TARGET", projection.unit.label)))
-			sgp_object <- getTargetScaleScore(
-				sgp_object, 
-				state, 
-				tmp.target.data[, c("ID", "CONTENT_AREA", "YEAR", tmp.target.level.names), with=FALSE],
-				target.type.iter,
-				tmp.target.level.names,
-				getYearsContentAreasGrades(state, years=unique(tmp.target.data$YEAR), content_areas=unique(tmp.target.data$CONTENT_AREA)),
-				sgp.config=sgp.config,
-				parallel.config=parallel.config)
+		for (projection_group.iter in unique(tmp.target.data[['SGP_PROJECTION_GROUP']])) {
+			for (target.type.iter in target.args[['sgp.target.scale.scores.types']]) {
+				tmp.target.level.names <- 
+					as.character(sapply(target.args[['target.level']], function(x) getTargetName(state, target.type.iter, x, max.sgp.target.years.forward, "SGP_TARGET", projection.unit.label, projection_group.iter)))
+				if (any(!tmp.target.level.names %in% names(tmp.target.data))) {
+					tmp.target.data[,tmp.target.level.names[!tmp.target.level.names %in% names(tmp.target.data)]:=as.integer(NA)]
+				}
+
+				sgp_object <- getTargetScaleScore(
+					sgp_object, 
+					state,
+					getTargetData(tmp.target.data, projection_group.iter, tmp.target.level.names),
+					target.type.iter,
+					tmp.target.level.names,
+					getYearsContentAreasGrades(state, years=unique(tmp.target.data[SGP_PROJECTION_GROUP==projection_group.iter][['YEAR']]), content_areas=unique(tmp.target.data[SGP_PROJECTION_GROUP==projection_group.iter][['CONTENT_AREA']])),
+					sgp.config=sgp.config,
+					projection_group.identifier=projection_group.iter,
+					parallel.config=parallel.config)
+			}
 		}
 	} ### END !is.null(sgp.target.scale.scores)
 

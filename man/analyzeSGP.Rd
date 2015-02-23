@@ -20,23 +20,25 @@ analyzeSGP(sgp_object,
          sgp.percentiles.baseline.max.order=3,
          sgp.projections.baseline.max.order=3,
          sgp.projections.lagged.baseline.max.order=3,
-	 sgp.projections.max.forward.progression.years=3,
-	 sgp.projections.max.forward.progression.grade=NULL,
-	 sgp.minimum.default.panel.years=NULL,
+         sgp.projections.max.forward.progression.years=3,
+         sgp.projections.max.forward.progression.grade=NULL,
+         sgp.minimum.default.panel.years=NULL,
          sgp.use.my.coefficient.matrices=NULL,
          simulate.sgps=TRUE,
-	 calculate.simex=NULL,
-	 calculate.simex.baseline=NULL,
+         calculate.simex=NULL,
+         calculate.simex.baseline=NULL,
          goodness.of.fit.print=TRUE,
          sgp.config=NULL,
          sgp.config.drop.nonsequential.grade.progression.variables=TRUE,
          sgp.baseline.panel.years=NULL,
          sgp.baseline.config=NULL,
+         trim.sgp.config=TRUE,
          parallel.config=NULL,
-	 verbose.output=FALSE,
-	 print.other.gp=NULL,
+         verbose.output=FALSE,
+         print.other.gp=NULL,
          sgp.projections.projection.unit="YEAR",
-	 get.cohort.data.info=FALSE,
+         get.cohort.data.info=FALSE,
+         sgp.sqlite=NULL,
          ...)
 }
 
@@ -103,6 +105,8 @@ Default is 3.  To utilize the maximum matrix order, set to NULL.
   \item{sgp.baseline.config}{A list containing three vectors: \code{sgp.content.areas}, \code{sgp.panel.years}, \code{sgp.grade.sequences} indicating how baseline student growth percentile analyses
  are to be conducted. In almost all cases this value is calculated by default within the function but can be specified directly for advanced use cases. See source code for more detail on this configuration option.
   }
+  \item{trim.sgp.config}{A Boolean variable indicating whether the arguments \code{content_areas}, \code{years} and \code{grades} should be used to 'trim' any manually supplied configuration for analysis supplied by 'sgp.config'.
+  }
 \item{parallel.config}{A named list with, at a minimum, two elements indicating 1) the BACKEND package to be used for parallel computation and 2) the WORKERS list to specify the number of processors to be used in each major analysis.  The BACKEND element can be set = to \code{FOREACH} or \code{PARALLEL}.  Please consult the manuals and vignettes for information of these packages!
 
 TYPE is a third element of the \code{parallel.config} list that provides necessary information when using FOREACH or PARALLEL packages as the backend. With BACKEND="FOREACH", the TYPE element specifies the flavor of 'foreach' backend.  As of version 1.0-1.0, only "doParallel" is supported.   If BACKEND = "PARALLEL", the \code{parallel} package will be used.  This package combines deprecated parallel packages \code{snow} and \code{multicore}.  Using the "snow" implementation of \code{parallel} the function will create a cluster object based on the TYPE element specified and the number of workers requested (see WORKERS list description below).  The TYPE element indicates the users preferred cluster type (either "SOCK" for socket cluster of "MPI" for an OpenMPI cluster). If Windows is the operating system, this "snow" implementation must be use and the TYPE element must = "SOCK".  Defaults are assigned based on operating system if TYPE is missing based on system OS.  Unix/Mac OS defaults to the "multicore" to avoid worker node pre-scheduling and appears to be more efficient in these operating systems.  
@@ -123,6 +127,9 @@ Example use cases are provided below.
   \item{get.cohort.data.info}{A Boolean argument (defaults to FALSE) indicating whether a summary of all cohorts to be submitted to the \code{\link{studentGrowthPercentiles}} and 
   \code{\link{studentGrowthProjections}} functions should be performed prior to analysis.
   }
+ \item{sgp.sqlite}{A Boolean argument (defaults to NULL) indicating whether a SQLite database file of the essential SGP data should be created from the \code{@Data} slot and subsequently used to extract data subsets for analysis with \code{\link{studentGrowthPercentiles}} and 
+  \code{\link{studentGrowthProjections}} functions.  The default, NULL, allows for an test of the size of the \code{@Data} object.  If greater than 1 GB \code{sgp.sqlite} is set to TRUE internally.  When TRUE, this step can take some time but can also substantially reduce the amount of RAM memory required to conduct analyses.  If set to TRUE the \code{tmp_data} directory and file "TMP_SGP_Data.sqlite" will be created.  This tmp_data directory and file are deleted by default although one may keep them if the argument is specified as the character "KEEP".  However, if an existing database of that name exists, it will be deleted and a new version created.
+ }
   \item{...}{Arguments to be passed to \code{\link{studentGrowthPercentiles}} or \code{\link{studentGrowthProjections}} for finer control over SGP calculations. NOTE: arguments can only be passed to one lower level function at a time, and only student growth percentiles OR projections can be created but not both at the same time.
   }
 }
@@ -155,13 +162,13 @@ Demonstration_SGP <- analyzeSGP(Demonstration_SGP, state="DEMO")
 #  and only perform analyses for most recent year (2012)
 
 my.custom.config <- list(
-MATHEMATICS.2012_2013 = list(
+MATHEMATICS.2013_2014 = list(
 	sgp.content.areas=rep("MATHEMATICS", 3), # Note, must be same length as sgp.panel.years
-	sgp.panel.years=c('2010_2011', '2011_2012', '2012_2013'),
+	sgp.panel.years=c('2011_2012', '2012_2013', '2013_2014'),
 	sgp.grade.sequences=list(3:4, 3:5, 4:6)),
-READING.2012_2013 = list(
+READING.2013_2014 = list(
 	sgp.content.areas=rep("READING", 3),
-	sgp.panel.years=c('2010_2011', '2011_2012', '2012_2013'),
+	sgp.panel.years=c('2011_2012', '2012_2013', '2013_2014'),
 	sgp.grade.sequences=list(3:4, 3:5, 4:6)))
 
 Demonstration_SGP <- prepareSGP(sgpData_LONG)
@@ -177,13 +184,13 @@ Demonstration_SGP <- analyzeSGP(Demonstration_SGP,
 
 #  Use different CONTENT_AREA priors, and only 1 year of prior data
 my.custom.config <- list(
-MATHEMATICS.2012_2013.READ_PRIOR = list(
+MATHEMATICS.2013_2014.READ_PRIOR = list(
 	sgp.content.areas=c("READING", "MATHEMATICS"),
-	sgp.panel.years=c('2011_2012', '2012_2013'),
+	sgp.panel.years=c('2012_2013', '2013_2014'),
 	sgp.grade.sequences=list(3:4, 4:5, 5:6)),
-READING.2012_2013.MATH_PRIOR = list(
+READING.2013_2014.MATH_PRIOR = list(
 	sgp.content.areas=c("MATHEMATICS", "READING"),
-	sgp.panel.years=c('2011_2012', '2012_2013'),
+	sgp.panel.years=c('2012_2013', '2013_2014'),
 	sgp.grade.sequences=list(3:4, 4:5, 5:6)))
 
 
@@ -192,13 +199,13 @@ READING.2012_2013.MATH_PRIOR = list(
 Demonstration_SGP <- prepareSGP(sgpData_LONG)
  
 DEMO.config <- list(
-READING.2011_2012 = list(
+READING.2012_2013 = list(
 	sgp.content.areas=c("MATHEMATICS", "READING", "MATHEMATICS", "READING", "READING"),
-	sgp.panel.years=c('2009_2010', '2009_2010', '2010_2011', '2010_2011', '2011_2012'),
+	sgp.panel.years=c('2010_2011', '2010_2011', '2011_2012', '2011_2012', '2012_2013'),
 	sgp.grade.sequences=list(c(3,3,4,4,5), c(4,4,5,5,6), c(5,5,6,6,7), c(6,6,7,7,8))),
-MATHEMATICS.2011_2012 = list(
+MATHEMATICS.2012_2013 = list(
 	sgp.content.areas=c("READING", "MATHEMATICS", "READING", "MATHEMATICS", "MATHEMATICS"),
-	sgp.panel.years=c('2009_2010', '2009_2010', '2010_2011', '2010_2011', '2011_2012'),
+	sgp.panel.years=c('2010_2011', '2010_2011', '2011_2012', '2011_2012', '2012_2013'),
 	sgp.grade.sequences=list(c(3,3,4,4,5), c(4,4,5,5,6), c(5,5,6,6,7), c(6,6,7,7,8))))
 
 Demonstration_SGP <- analyzeSGP(
@@ -226,9 +233,9 @@ Demonstration_SGP <- analyzeSGP(Demonstration_SGP,
 	parallel.config=list(
 		BACKEND="PARALLEL", TYPE="SOCK",
 		WORKERS=list(PERCENTILES=4, 
-		    PROJECTIONS=2, 
-		    LAGGED_PROJECTIONS=2,
-		    BASELINE_PERCENTILES=4))
+                    PROJECTIONS=2, 
+                    LAGGED_PROJECTIONS=2,
+                    BASELINE_PERCENTILES=4))
 
 ##  New parallel package - only available with R 2.13 or newer
 #  Note there are up to 16 workers, and MPI is used, 
@@ -237,9 +244,9 @@ Demonstration_SGP <- analyzeSGP(Demonstration_SGP,
 	parallel.config=list(
 		BACKEND="PARALLEL", TYPE="MPI",
 		WORKERS=list(PERCENTILES=16, 
-		    PROJECTIONS=8, 
-		    LAGGED_PROJECTIONS=6,
-		    BASELINE_PERCENTILES=12))
+                    PROJECTIONS=8, 
+                    LAGGED_PROJECTIONS=6,
+                    BASELINE_PERCENTILES=12))
 	...
 
 ## FOREACH use cases:

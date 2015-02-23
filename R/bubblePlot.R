@@ -275,6 +275,9 @@ if (bubble_plot_configs.BUBBLE_PLOT_DEVICE == "PDF") {
       pdf(file=file.path.and.name, width=fig.width, height=8.5, bg=format.colors.background, version="1.4")
 }
 
+if (bubble_plot_configs.BUBBLE_PLOT_DEVICE == "PNG") {
+	Cairo(file=gsub(".pdf", ".png", file.path.and.name), width=fig.width, height=8.5, bg=format.colors.background, units="in", dpi=144, pointsize=10.5)
+}
 
 # Create plot (if bubble_plot_configs.BUBBLE_TIPS==TRUE)
 
@@ -700,7 +703,7 @@ popViewport()
 
 # Turn off device
 
-if (bubble_plot_configs.BUBBLE_PLOT_DEVICE == "PDF") {
+if (bubble_plot_configs.BUBBLE_PLOT_DEVICE %in% c("PDF", "PNG")) {
     dev.off()
 }
 
@@ -712,7 +715,6 @@ if (bubble_plot_configs.BUBBLE_TIPS) {
 	temp_pdf <- temp_pdf[-which(temp_pdf=="/C [ 0 1 1 ]")]
 	temp_pdf <- temp_pdf[-grep("PLACEHOLDER", temp_pdf)]
 	writeLines(temp_pdf, file.path.and.name)
-
 } ## End if BUBBLE_TIPS == TRUE
 
 

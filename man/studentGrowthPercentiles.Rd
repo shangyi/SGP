@@ -28,13 +28,15 @@ studentGrowthPercentiles(panel.data,
                          print.other.gp=FALSE,                             
                          print.sgp.order=FALSE,
                          calculate.sgps=TRUE,                                       
-                         rq.method="br",                                           
+                         rq.method="br",
+                         max.n.for.coefficient.matrices=NULL,
                          knot.cut.percentiles=c(0.2,0.4,0.6,0.8),
                          knots.boundaries.by.panel=FALSE,
                          exact.grade.progression.sequence=FALSE,
                          drop.nonsequential.grade.progression.variables=TRUE, 
                          convert.0and100=TRUE,                                   
                          sgp.quantiles="Percentiles",
+                         sgp.quantiles.labels=NULL,
                          sgp.loss.hoss.adjustment=NULL,
                          sgp.cohort.size=NULL,
                          percuts.digits=0,                                  
@@ -46,6 +48,7 @@ studentGrowthPercentiles(panel.data,
                          return.prior.scale.score.standardized=TRUE,
                          return.norm.group.identifier=TRUE,
                          return.norm.group.scale.scores=NULL,
+                         return.panel.data=FALSE,
                          print.time.taken=TRUE,
                          parallel.config=NULL,
 			 calculate.simex=NULL,
@@ -80,7 +83,7 @@ studentGrowthPercentiles(panel.data,
   \item{year.progression}{Character vector of years associated with grade and content area progressions. If missing then the year.progression is assumed to end in 'my.year' provided in
 sgp.labels and be of the same length as grade.progression.  Vector will be used to populate the @Years slot of the splineMatrix class coefficient matrices.
   }
-  \item{year_lags.progression}{A numeric vector indicating the time lags/span between observations in the columns supplied to 'studentGrowthPercentiles'. The default, NULL, allows the function
+  \item{year_lags.progression}{A numeric vector indicating the time lags/span between observations in the columns supplied to \code{studentGrowthPercentiles}. The default, NULL, allows the function
 to calculate the lags/differences based upon the supplied years.
   }
   \item{num.prior}{Number of prior scores one wishes to use in the analysis. Defaults to \code{num.panels-1}. 
@@ -116,7 +119,7 @@ to calculate the lags/differences based upon the supplied years.
  \item{calculate.confidence.intervals}{A character vector providing either a state acronym or a variable name from the supplied panel data. If a state acronym, CSEM tables from the embedded 
    \code{\link{SGPstateData}} (note: CSEM data must be embedded in the \code{SGPstateData} set. To have your state CSEMs embed in the \code{SGPstateData} set, please contact the package
    administrator) will be used. If a variable name, the supplied panel data must contain a variable providing student level CSEMs (e.g., with adaptive testing). NOTE: If a variable
-   name is supplied, the user must also use the argument \code{panel.data.vnames} indicating what variables in the supplied \code{panel.data} will be used for the \code{studentGrowthPercentile} 
+   name is supplied, the user must also use the argument \code{panel.data.vnames} indicating what variables in the supplied \code{panel.data} will be used for the \code{studentGrowthPercentiles} 
    analysis. For greater control, the user can also supply a list of the form \code{list(state= , confidence.quantiles= , simulation.iterations= , distribution= , round= )} or 
    \code{list(variable= , confidence.quantiles= , simulation.iterations= , distribution= , round= )} specifying the \code{state} or \code{variable} to use,
    \code{confidence.quantiles} to report from the simulated SGPs calculated for each student, \code{simulation.iterations} indicating the number of simulated SGPs to calculate, 
@@ -131,6 +134,9 @@ to calculate the lags/differences based upon the supplied years.
   } 
   \item{rq.method}{Argument to define the estimation method used in the quantile regression calculations. The default is the the \code{"br"} method referring to the Barrodale and Robert's L1 estimation detailed in Koenker (2005) and in the help for the quantile regression package.
   }
+  \item{max.n.for.coefficient.matrices}{Argument the defines a size threshold above which a subset of data is taken with a number of cases equal to the sgp.subset.size.threshold argument. Default is NULL,
+  no subset is taken. 
+  }
   \item{knot.cut.percentiles}{Argument that specifies the quantiles to be used for calculation of B-spline knots. Default is to place knots at the 0.2, 0.4, 0.6, and 0.8 quantiles. 
   }
   \item{knots.boundaries.by.panel}{Boolean argument (defaults to FALSE) indicating whether knots and boundaries should be calculated by panel in supplied panel data instead of aggregating across panel. If panels are on different scales, then different knots and boundaries may be required to accommodate quantile regression analyses.
@@ -143,6 +149,8 @@ to calculate the lags/differences based upon the supplied years.
   }
   \item{sgp.quantiles}{Argument to specify quantiles for quantile regression estimation. Default is Percentiles. User can additionally submit a vector of quantiles (between 0 and 1). Goodness of fit output only available currently for PERCENTILES. 
   }
+  \item{sgp.quantiles.labels}{Argument to specify integer labels associated with provided 'sgp.quantiles'. Integer labels must a vector of length 1 longer than the length of 'sgp.quantiles'. 
+  }
   \item{sgp.loss.hoss.adjustment}{Argument to control whether SGP is calculated using which.max for values associated with the hoss embedded in SGPstateData. Providing two letter state acronym utilizes this adjustment whereas supply NULL (the default) uses no adjustment. 
   }
   \item{sgp.cohort.size}{Argument to control the minimum cohort size used to calculate SGPs and associated coefficient matrices. NULL (the default) uses no restriction.  If not NULL, argument should be an integer value. 
@@ -150,7 +158,7 @@ to calculate the lags/differences based upon the supplied years.
   \item{percuts.digits}{Argument specifying how many digits (defaults to 2) to print percentile cuts (if asked for) with.
   }
   \item{isotonize}{Boolean argument (defaults to TRUE) indicating whether quantile regression results are isotonized to prevent quantile crossing following the 
-  methods derived by Dette & Volgushev (2008). 
+  methods derived by Chernozhukov, Fernandez-Val and Glichon (2010). 
   }
   \item{convert.using.loss.hoss}{Boolean argument (defaults to TRUE) indicating whether requested percentile cuts are adjusted using the lowest obtainable scale 
    score (LOSS) and highest obtainable scale score (HOSS). Those percentile cuts above the HOSS are replaced with the HOSS and those percentile cuts below the 
@@ -173,11 +181,13 @@ Useful for examining relationship between prior achievement and student growth.
   \item{return.norm.group.scale.scores}{Boolean argument (defaults. to NULL) indicating whether to return a comma separated character vector of the scores associated with the SGP_NORM_GROUP to
   which the student belongs.
   }
-  \item{print.time.taken}{Boolean argument (defaults to TRUE) indicating whether to print message indicating information on studentGrowthPercentile analysis and time taken.
+  \item{return.panel.data}{Boolean argument indicating whether to return the original data provided in \code{panel.data$Panel_Data} in the SGP list of results.  Defaults to FALSE which returns a NULL list element.
+  }
+  \item{print.time.taken}{Boolean argument (defaults to TRUE) indicating whether to print message indicating information on \code{studentGrowthPercentiles} analysis and time taken.
   }
   \item{parallel.config}{parallel configuration argument allowing for parallel analysis by 'tau'. Defaults to NULL.
   }
-  \item{calculate.simex}{A character state acronymn or list including state/csem variable, simulation.iterations, simulation.sample.size, lambda and extrapolation method. 
+  \item{calculate.simex}{A character state acronym or list including state/csem variable, simulation.iterations, simulation.sample.size, lambda and extrapolation method. 
   Defaults to NULL, no simex calculations performed.
   }
   \item{sgp.percentiles.set.seed}{An integer (or NULL) argument indicating whether to set.seed to make analyses fully reproducible. To turn off, set argument to NULL. Default is 314159.
@@ -206,8 +216,8 @@ Educational Measurement: Issues and Practice, 28(4):42-51.
 Betebenner, D. W. (2008). Toward a normative understanding of student growth. In K. E. Ryan & 
 L. A. Shepard (Eds.), \emph{The Future of Test Based Accountability} (pp. 155-170). New York: Routledge.
 
-Dette, H. & Volgushev, S. (2008). Non-crossing non-parametric estimates of quantile curves. Journal of the Royal Statistical Society B,
-70(3), 609-627.
+Chernozhukov, V., Fernandez-Val, I. and Galichon, A. (2010),
+Quantile and Probability Curves Without Crossing. Econometrica, 78: 1093-1125.
 
 Koenker, R. (2005). \emph{Quantile regression}. Cambridge: Cambridge University Press.
 }
@@ -223,7 +233,7 @@ Koenker, R. (2005). \emph{Quantile regression}. Cambridge: Cambridge University 
 
 require(SGPdata)
 sgp_g4 <- studentGrowthPercentiles(panel.data=sgpData,
-                sgp.labels=list(my.year=2013, my.subject="Reading"),
+                sgp.labels=list(my.year=2014, my.subject="Reading"),
                 percentile.cuts=c(1,35,65,99),
                 subset.grade=4,
                 num.prior=1)
@@ -231,7 +241,7 @@ sgp_g4 <- studentGrowthPercentiles(panel.data=sgpData,
 ## NOTE: "grade.progression" can be used in place of "subset.grade" and "num.prior" 
  
 sgp_g4_v2 <- studentGrowthPercentiles(panel.data=sgpData,
-                   sgp.labels=list(my.year=2013, my.subject="Reading"),
+                   sgp.labels=list(my.year=2014, my.subject="Reading"),
                    percentile.cuts=c(1,35,65,99),
                    grade.progression=c(3,4))
 
@@ -241,7 +251,7 @@ identical(sgp_g4$SGPercentiles, sgp_g4_v2$SGPercentiles)
 ## file and used by supplying the appropriate two letter state acronym.
  
 sgp_g4_DEMO <- studentGrowthPercentiles(panel.data=sgpData,
-                   sgp.labels=list(my.year=2013, my.subject="Reading"),
+                   sgp.labels=list(my.year=2014, my.subject="Reading"),
                    use.my.knots.boundaries="DEMO",
                    grade.progression=c(3,4))
 
@@ -249,7 +259,7 @@ sgp_g4_DEMO <- studentGrowthPercentiles(panel.data=sgpData,
 ## Sample code for running non-sequential grade progression analysis.
 
 sgp_g8_DEMO <- studentGrowthPercentiles(panel.data=sgpData,
-                   sgp.labels=list(my.year=2013, my.subject="Reading"),
+                   sgp.labels=list(my.year=2014, my.subject="Reading"),
                    use.my.knots.boundaries="DEMO",
                    grade.progression=c(5,6,8))
 
@@ -259,32 +269,32 @@ sgp_g8_DEMO <- studentGrowthPercentiles(panel.data=sgpData,
 ## Load 'grid' package to access grid.draw function
 
 require(grid)
-grid.draw(sgp_g4$Goodness_of_Fit$READING.2013$GRADE_4)
+grid.draw(sgp_g4$Goodness_of_Fit$READING.2014$GRADE_4)
 
 require(grid)
-pdf(file="Grade_4_Reading_2013_GOF.pdf", width=8.5, height=4.5)
-   grid.draw(sgp_g4$Goodness_of_Fit$READING.2013$GRADE_4)
+pdf(file="Grade_4_Reading_2014_GOF.pdf", width=8.5, height=4.5)
+   grid.draw(sgp_g4$Goodness_of_Fit$READING.2014$GRADE_4)
 dev.off()
 
 # Other grades
 
 sgp_g5 <- studentGrowthPercentiles(panel.data=sgpData,
-                sgp.labels=list(my.year=2013, my.subject="Reading"),
+                sgp.labels=list(my.year=2014, my.subject="Reading"),
                 percentile.cuts=c(1,35,65,99),
                 grade.progression=3:5)
 
 sgp_g6 <- studentGrowthPercentiles(panel.data=sgpData,
-                sgp.labels=list(my.year=2013, my.subject="Reading"),
+                sgp.labels=list(my.year=2014, my.subject="Reading"),
                 percentile.cuts=c(1,35,65,99),
                 grade.progression=3:6)
 
 sgp_g7 <- studentGrowthPercentiles(panel.data=sgpData,
-                sgp.labels=list(my.year=2013, my.subject="Reading"),
+                sgp.labels=list(my.year=2014, my.subject="Reading"),
                 percentile.cuts=c(1,35,65,99),
                 grade.progression=3:7)
 
 sgp_g8 <- studentGrowthPercentiles(panel.data=sgpData,
-                sgp.labels=list(my.year=2013, my.subject="Reading"),
+                sgp.labels=list(my.year=2014, my.subject="Reading"),
                 percentile.cuts=c(1,35,65,99),
                 grade.progression=4:8)
 
@@ -294,11 +304,11 @@ sgp_g8 <- studentGrowthPercentiles(panel.data=sgpData,
 
 # Combine all results
 
-sgp_all <- rbind(sgp_g4$SGPercentiles$READING.2013,
-                 sgp_g5$SGPercentiles$READING.2013,
-                 sgp_g6$SGPercentiles$READING.2013,
-                 sgp_g7$SGPercentiles$READING.2013,
-                 sgp_g8$SGPercentiles$READING.2013)
+sgp_all <- rbind(sgp_g4$SGPercentiles$READING.2014,
+                 sgp_g5$SGPercentiles$READING.2014,
+                 sgp_g6$SGPercentiles$READING.2014,
+                 sgp_g7$SGPercentiles$READING.2014,
+                 sgp_g8$SGPercentiles$READING.2014)
 
 # Save SGP results to .csv file
 
@@ -316,7 +326,7 @@ my.sgpData <- list(Panel_Data=sgpData)   ### Put sgpData into Panel_Data slot
 
 for (i in seq_along(my.grade.sequences)) {
      my.sgpData <- studentGrowthPercentiles(panel.data=my.sgpData,
-                     sgp.labels=list(my.year=2013, my.subject="Reading"),
+                     sgp.labels=list(my.year=2014, my.subject="Reading"),
                      growth.levels="DEMO",
                      goodness.of.fit="DEMO",
                      grade.progression=my.grade.sequences[[i]])
@@ -324,14 +334,14 @@ for (i in seq_along(my.grade.sequences)) {
 
 #  Save Student Growth Percentiles results to a .csv file:
 
-write.csv(my.sgpData$SGPercentiles$READING.2013, 
-file="2013_Reading_SGPercentiles.csv", row.names=FALSE, quote=FALSE, na="")
+write.csv(my.sgpData$SGPercentiles$READING.2014, 
+file="2014_Reading_SGPercentiles.csv", row.names=FALSE, quote=FALSE, na="")
 
 # Create PDFs of all Goodness of Fit results:
 
-for (i in names(my.sgpData$Goodness_of_Fit$READING.2013)) {
-    pdf(file=paste(i, "_Reading_2013_GOF.pdf", sep=""), width=8.5, height=11)
-       grid.draw(my.sgpData[["Goodness_of_Fit"]][["READING.2013"]][[i]])
+for (i in names(my.sgpData$Goodness_of_Fit$READING.2014)) {
+    pdf(file=paste(i, "_Reading_2014_GOF.pdf", sep=""), width=8.5, height=11)
+       grid.draw(my.sgpData[["Goodness_of_Fit"]][["READING.2014"]][[i]])
     dev.off()
 }
 
@@ -356,7 +366,7 @@ my.grade.sequences <- list(3:4, 3:5, 3:6, 3:7, 4:8)
 
 for (i in seq_along(my.grade.sequences)) {
     my.sgpData <- studentGrowthPercentiles(panel.data=my.sgpData,
-      sgp.labels=list(my.year=2013, my.subject="Reading"),
+      sgp.labels=list(my.year=2014, my.subject="Reading"),
       calculate.confidence.intervals=list(state="DEMO", 
          confidence.quantiles=c(0.1, 0.9), simulation.iterations=100, 
          distribution="Normal", round=1),
@@ -371,32 +381,32 @@ my.sgpData <- list(Panel_Data=sgpData)   ### Put sgpData into Panel_Data slot
 
 for (i in seq_along(my.grade.sequences)) {
      my.sgpData <- studentGrowthPercentiles(panel.data=my.sgpData,
-                     sgp.labels=list(my.year=2013, my.subject="Reading"),
+                     sgp.labels=list(my.year=2014, my.subject="Reading"),
                      growth.levels="DEMO",
                      grade.progression=my.grade.sequences[[i]])
 }
 
-percentiles.1st.run <- my.sgpData$SGPercentiles$READING.2013 
+percentiles.1st.run <- my.sgpData$SGPercentiles$READING.2014 
 
-### my.sgpData has as full set of coefficient matrices for Reading, 2013. To view these
+### my.sgpData has as full set of coefficient matrices for Reading, 2014. To view these
 
-names(my.sgpData$Coefficient_Matrices$READING.2013)
+names(my.sgpData$Coefficient_Matrices$READING.2014)
 
 ## Let's NULL out the SGPercentiles slot and recreate the percentiles 
 ## using the embedded coefficient matrices
 
-my.sgpData$SGPercentiles$READING.2013 <- NULL
+my.sgpData$SGPercentiles$READING.2014 <- NULL
 
 for (i in seq_along(my.grade.sequences)) {
      my.sgpData <- studentGrowthPercentiles(panel.data=my.sgpData,
-                     sgp.labels=list(my.year=2013, my.subject="Reading"),
-			   use.my.knots.boundaries=list(my.year=2013, my.subject="Reading"),
-                     use.my.coefficient.matrices=list(my.year=2013, my.subject="Reading"),
+                     sgp.labels=list(my.year=2014, my.subject="Reading"),
+			   use.my.knots.boundaries=list(my.year=2014, my.subject="Reading"),
+                     use.my.coefficient.matrices=list(my.year=2014, my.subject="Reading"),
                      growth.levels="DEMO",
                      grade.progression=my.grade.sequences[[i]])
 }
 
-percentiles.2nd.run <- my.sgpData$SGPercentiles$READING.2013 
+percentiles.2nd.run <- my.sgpData$SGPercentiles$READING.2014 
 
 identical(percentiles.1st.run, percentiles.2nd.run)
 

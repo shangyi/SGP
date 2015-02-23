@@ -1,6 +1,6 @@
 \name{studentGrowthPlot_Styles}
 \alias{studentGrowthPlot_Styles}
-\title{studentGrowth_Styles providing base templates for the core studentGrowthPlot function}
+\title{studentGrowthPlot_Styles providing base templates for the core studentGrowthPlot function}
 \description{
 Function includes five "styles" associated with \code{\link{studentGrowthPlot}} to create PDF student growth plots depicting the growth and achievement for an individual
 student over time. The five styles display one to five content area student growth plots on a single page. The one, two, and three content area plots are rendered on 8.5 by 11
@@ -10,6 +10,7 @@ is called by \code{\link{visualizeSGP}} to generate individual student reports. 
 \usage{
 studentGrowthPlot_Styles(
            sgPlot.data,
+           sgPlot.sgp_object,
            state,
            last.year,
            content_areas,
@@ -37,6 +38,8 @@ studentGrowthPlot_Styles(
 \arguments{
   \item{sgPlot.data}{Wide formatted individual student report data used to produce student growth plots. To view structure of wide formatted data, utilize the 
 \code{sgPlot.save.sgPlot.data} option with \code{\link{visualizeSGP}} to save wide formatted student growth plot data.
+  }
+  \item{sgPlot.sgp_object}{SGP object containing coefficient matrices and knots and boundaries for percentile trajectory calculations associated with JSON output.
   }
   \item{state}{Acronym indicating state associated with the summaries for access to assessment program information embedded in \code{SGPstateData}.
   }

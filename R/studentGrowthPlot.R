@@ -14,12 +14,11 @@ function(Scale_Scores,                        ## Vector of Scale Scores
 	Plotting_SGP_Scale_Score_Targets,     ## Vector of CUKU, CUKU_Current, MUSU, MUSU_Current scale score targets for plotting (transformed if non-vertical scale)
 	Cutscores,                            ## data.frame of long formatted achievement level cutscores
 	Years,                                ## Vector of years corresponding to Scale_Scores, Content_Areas, ... arguments supplied
-	Report_Parameters) {                  ## list containing Current_Year, Content_Area, Content_Area_Title, State, Denote_Content_Area, SGP_Targets, Configuration
+	Report_Parameters) {                  ## list containing Current_Year, Content_Area, Content_Area_Title, State, Denote_Content_Area, SGP_Targets, Configuration, Language, Assessment_Transition
 
 
 ### Create relevant variables
 
-content.area.label <- SGPstateData[[Report_Parameters$State]][["Student_Report_Information"]][["Content_Areas_Labels"]][[Report_Parameters$Content_Area_Title]]
 CUTLEVEL <- level_1_curve <- NULL ## To prevent R CMD check warnings
 number.achievement.level.regions <- length(SGPstateData[[Report_Parameters$State]][["Student_Report_Information"]][["Achievement_Level_Labels"]])
 achievement.level.labels <- SGPstateData[[Report_Parameters$State]][["Student_Report_Information"]][["Achievement_Level_Labels"]]
@@ -27,6 +26,11 @@ number.growth.levels <- length(SGPstateData[[Report_Parameters$State]][["Growth"
 growth.level.labels <- SGPstateData[[Report_Parameters$State]][["Growth"]][["Levels"]]
 growth.level.cutscores <- SGPstateData[[Report_Parameters$State]][["Growth"]][["Cutscores"]][["Cuts"]]
 growth.level.cutscores.text <- SGPstateData[[Report_Parameters$State]][["Growth"]][["Cutscores"]][["Labels"]]
+if (!is.na(Report_Parameters$Content_Area_Title)) {
+	content.area.label <- SGPstateData[[Report_Parameters$State]][["Student_Report_Information"]][["Content_Areas_Labels"]][[Report_Parameters$Content_Area_Title]]
+} else {
+	content.area.label <- SGPstateData[[Report_Parameters$State]][["Student_Report_Information"]][["Content_Areas_Labels"]][[Report_Parameters$Content_Area]]
+}
 
 if (!is.null(SGPstateData[[Report_Parameters$State]][["SGP_Configuration"]][["content_area.projection.sequence"]][[Report_Parameters$Content_Area]])) {
 	grades.content_areas.reported.in.state <- data.frame(
@@ -43,7 +47,6 @@ if (!is.null(SGPstateData[[Report_Parameters$State]][["SGP_Configuration"]][["co
 				stringsAsFactors=FALSE
 				)
 }
-grades.content_areas.reported.in.state$GRADE_NUMERIC <- as.numeric(grades.content_areas.reported.in.state$GRADE[1])+c(0, cumsum(tail(grades.content_areas.reported.in.state$YEAR_LAG, -1)))
 grades.content_areas.reported.in.state$GRADE_NUMERIC <- (as.numeric(grades.content_areas.reported.in.state$GRADE[2])-1)+c(0, cumsum(tail(grades.content_areas.reported.in.state$YEAR_LAG, -1)))
 
 test.abbreviation <- SGPstateData[[Report_Parameters$State]][["Assessment_Program_Information"]][["Assessment_Abbreviation"]]
@@ -103,10 +106,63 @@ if (!is.null(SGPstateData[[Report_Parameters$State]][['SGP_Configuration']][['sg
 }
 
 if (is.null(SGPstateData[[Report_Parameters$State]][['SGP_Configuration']][['Show_Fan_Cut_Scores']])) {
-	Report_Parameters[['Configuration']][['Show_Fan_Cut_Scores']] <- FALSE
+	show.fan.cutscores <- FALSE
 } else {
-	Report_Parameters[['Configuration']][['Show_Fan_Cut_Scores']] <- TRUE
+	show.fan.cutscores <- TRUE
 }
+
+if (is.null(Report_Parameters[['Configuration']][['Font_Size']])) {
+	title.ca.size <- 1.8
+	legend.size <- 0.5
+	bottom.right.vp.size <- 1.2
+	bottom.left.vp.size <- 0.7
+} else {
+	title.ca.size <- Report_Parameters[['Configuration']][['Font_Size']][['title.ca.size']]
+	legend.size <- Report_Parameters[['Configuration']][['Font_Size']][['legend.size']]
+	bottom.right.vp.size <- Report_Parameters[['Configuration']][['Font_Size']][['bottom.right.vp.size']]
+	bottom.left.vp.size <- Report_Parameters[['Configuration']][['Font_Size']][['bottom.left.vp.size']]
+}
+
+if (is.null(Report_Parameters[['Configuration']][['Language']])) {
+	achievement.label <- "Achievement"
+	achievement_level.label <- "Achievement Level"
+	achievement_target.label <- "Achievement Target"
+	growth.label <- "Growth"
+	growth_percentile.label <- "Growth Percentile"
+	growth_level.label <- "Growth Level"
+	growth_target.label <- "Growth Target"
+	level.label <- "Level"
+	percentiles.label <- "Percentiles"
+	scale_score.label <- "Scale Score"
+	grade.label <- "Grade"
+	CU.label <- "Catch Up"
+	KU.label <- "Keep Up"
+	MU.label <- "Move Up"
+	SU.label <- "Stay Up"
+	target.label <- "Target"
+} else {
+	if (Report_Parameters[['Configuration']][['Language']]=="Spanish") {
+		achievement.label <- "Resultado"
+		achievement_level.label <- "Nivel de Capacitaci\uF3n" # Hex code for accented o is \uF3 - http://www.ascii.cl/htmlcodes.htm
+		achievement_target.label <- "Meta de Capacitaci\uF3n"
+		growth.label <- "Crecimiento"
+		growth_percentile.label <- "Porcentaje de Crecimiento"
+		growth_level.label <- "Nivel de Crecimiento"
+		growth_target.label <- "Meta de Crecimiento"
+		level.label <- "Niveles"
+		percentiles.label <- "El Percentil"
+		scale_score.label <- "Escala"
+		grade.label <- "Grado"
+		CU.label <- "Alcanzar"
+		KU.label <- "Guadar"
+		MU.label <- "Avanzar"
+		SU.label <- "Mantener"
+		target.label <- "Meta"
+		SGP_Levels <- SGPstateData[[Report_Parameters$State]][["Growth"]][["Levels"]][match(SGP_Levels, SGPstateData[[paste(head(unlist(strsplit(Report_Parameters$State, "_")), -1), collapse="_")]][["Growth"]][["Levels"]])]
+	}
+}
+
+if (length(content_area.label.pieces <- strsplit(content.area.label, " ")[[1]])==1) split.content_area.tf <- FALSE else split.content_area.tf <- TRUE
 
 
 ### Utility functions
@@ -169,8 +225,8 @@ interpolate.grades <- function(grades, content_areas, data.year.span) {
 		tmp.grades.numeric <- x
 		tmp.content_areas <- grades.content_areas.reported.in.state$CONTENT_AREA[match(x, grades.content_areas.reported.in.state$GRADE_NUMERIC)]
 		tmp.grades <- convert.grades(x, to="GRADE")
-		tmp.head <- match(x[1], grades.content_areas.reported.in.state$GRADE_NUMERIC)
-		tmp.tail <- match(tail(x, 1), grades.content_areas.reported.in.state$GRADE_NUMERIC)
+		tmp.head <- min(which(x[1] <= grades.content_areas.reported.in.state$GRADE_NUMERIC), na.rm=TRUE)
+		tmp.tail <- min(which(tail(x, 1) <= grades.content_areas.reported.in.state$GRADE_NUMERIC), na.rm=TRUE)
 		if (tmp.head==1) {
 			tmp.grades <- c("GRADE_LOWER", tmp.grades); tmp.content_areas <- c("PLACEHOLDER", tmp.content_areas); tmp.grades.numeric <- c(NA, tmp.grades.numeric)
 		} else {
@@ -179,7 +235,9 @@ interpolate.grades <- function(grades, content_areas, data.year.span) {
 			tmp.grades.numeric <- c(grades.content_areas.reported.in.state$GRADE_NUMERIC[tmp.head-1], tmp.grades.numeric)
 		}
 		if (tmp.tail==dim(grades.content_areas.reported.in.state)[1]) {
-			tmp.grades <- c(tmp.grades, "GRADE_UPPER"); tmp.content_areas <- c(tmp.content_areas, "PLACEHOLDER"); tmp.grades.numeric <- c(tmp.grades.numeric, NA)
+			tmp.grades <- c(tmp.grades, "GRADE_UPPER"); 
+			tmp.content_areas <- c(tmp.content_areas, "PLACEHOLDER"); 
+			tmp.grades.numeric <- c(tmp.grades.numeric, NA)
 		} else {
 			tmp.grades <- c(tmp.grades, grades.content_areas.reported.in.state$GRADE[tmp.tail+1])
 			tmp.content_areas <- c(tmp.content_areas, grades.content_areas.reported.in.state$CONTENT_AREA[tmp.tail+1])
@@ -297,8 +355,8 @@ if (grade.values$year_span > 0) {
 	year.text <- head(year.text, studentGrowthPlot.year.span)
 	content_area.text <- grade.values$interp.df$CONTENT_AREA[match(gsub("-", "_", year.text), grade.values$years)]
 	content_area.text[is.na(content_area.text)] <- " "
-	for (i in which(content_area.text %in% names(SGPstateData[["DEMO"]][["Student_Report_Information"]][["Content_Areas_Labels"]]))) {
-		content_area.text[i] <- SGPstateData[["DEMO"]][["Student_Report_Information"]][["Content_Areas_Labels"]][[content_area.text[i]]]
+	for (i in which(content_area.text %in% names(SGPstateData[[Report_Parameters$State]][["Student_Report_Information"]][["Content_Areas_Labels"]]))) {
+		content_area.text[i] <- SGPstateData[[Report_Parameters$State]][["Student_Report_Information"]][["Content_Areas_Labels"]][[content_area.text[i]]]
 	}
 
 	if (grade.values$increment_for_projection_current > 0) {
@@ -309,10 +367,13 @@ if (grade.values$year_span > 0) {
 		grades.text.numbers <- Grades[grade.values$year_span:1]
 		tmp.grades.text.numbers <- head(grade.values$interp.df$GRADE[-1], studentGrowthPlot.year.span)
 	}
+	if (!is.null(Report_Parameters[['Configuration']][['Zero_to_K']])) {
+		grades.text.numbers[which(grades.text.numbers==0)] <- "K"
+	}
 	grades.text.numbers.missing <- which(is.na(grades.text.numbers))
 	grades.text.numbers.non.tested <- which(!tmp.grades.text.numbers %in% grades.content_areas.reported.in.state$GRADE)
 	grades.text.eoct <- which(grades.text.numbers=="EOCT")
-	grades.text <- c(paste("Grade", grades.text.numbers), rep(" ", studentGrowthPlot.year.span))
+	grades.text <- c(paste(grade.label, grades.text.numbers), rep(" ", studentGrowthPlot.year.span))
 	grades.text[grades.text.numbers.non.tested] <- "Non-tested Grade"
 	grades.text[grades.text.numbers.missing] <- missing.data.symbol
 	grades.text[grades.text.eoct] <- "EOCT"
@@ -412,11 +473,19 @@ growth.chart.vp <- viewport(name="growth.chart.vp",
                     yscale=yscale.range,
                     gp=gpar(fill="transparent"))
 
-right.vp <- viewport(name="right.vp",
-                    layout.pos.row=1, layout.pos.col=3,
-                    xscale=c(0,1),
-                    yscale=c(0,1),
-                    gp=gpar(fill="transparent"))
+if (is.null(Report_Parameters$Assessment_Transition)) {
+	right.vp <- viewport(name="right.vp",
+		layout.pos.row=1, layout.pos.col=3,
+		xscale=c(0,1),
+		yscale=c(0,1),
+		gp=gpar(fill="transparent"))
+} else {
+	right.vp <- viewport(name="right.vp",
+		layout.pos.row=1, layout.pos.col=3,
+		xscale=c(0,1),
+		yscale=yscale.range,
+		gp=gpar(fill="transparent"))
+}
 
 left.vp <- viewport(name="left.vp",
                     layout.pos.row=1, layout.pos.col=1,
@@ -424,8 +493,13 @@ left.vp <- viewport(name="left.vp",
                     yscale=yscale.range,
                     gp=gpar(fill="transparent"))
 
-growth.and.left.vp <- viewport(name="growth.and.left.vp",
-                    layout.pos.row=1, layout.pos.col=1:2)
+if (is.null(Report_Parameters$Assessment_Transition)) {
+	growth.and.margins.vp <- viewport(name="growth.and.margins.vp",
+		layout.pos.row=1, layout.pos.col=1:2)
+} else {
+	growth.and.margins.vp <- viewport(name="growth.and.margins.vp",
+		layout.pos.row=1, layout.pos.col=1:3)
+}
 
 bottom.vp <- viewport(name="bottom.vp",
                     layout.pos.row=2, layout.pos.col=2,
@@ -551,7 +625,7 @@ if (paste(Grades[1], Content_Areas[1]) != tail(paste(grades.content_areas.report
 				y=(max(yscale.range[1], cuts.ny1[i])+min(yscale.range[2], cuts.ny1[i+1]))/2, growth.level.labels[i],
 				default.units="native", just="left", gp=gpar(cex=0.4, col=border.color))
 		}
-		if (i != 1 & Report_Parameters[['Configuration']][['Show_Fan_Cut_Scores']]) {
+		if (i != 1 & show.fan.cutscores) {
 			grid.text(x=current.year+grade.values$increment_for_projection_current+0.05, y=cuts.ny1[i], as.character(cuts.ny1.text[i]),
 				default.units="native", just="left", gp=gpar(cex=0.4, col=border.color))
 		}
@@ -574,25 +648,25 @@ if (!is.null(Report_Parameters[['SGP_Targets']])) {
 
 		if (length(grep("CUKU", i))>0 & tmp.achievement.level <= level.to.get.cuku) {
 			label.position <- c(label.position, "center")
-			tmp.target.label <- c("Catch Up", "Target")
+			tmp.target.label <- c(CU.label, target.label)
 			y.coordinates <- c(as.numeric(convertY(convertY(unit(Plotting_SGP_Scale_Score_Targets[[i]][['NY1']], "native"), "inches")+unit(0.0375, "inches"), "native")), 
 						as.numeric(convertY(convertY(unit(Plotting_SGP_Scale_Score_Targets[[i]][['NY1']], "native"), "inches")-unit(0.0375, "inches"), "native"))) 
 		}
 		if (length(grep("CUKU", i))>0 & tmp.achievement.level > level.to.get.cuku) {
 			label.position <- c(label.position, "top")
-			tmp.target.label <- c("Keep Up", "Target")
+			tmp.target.label <- c(KU.label, target.label)
 			y.coordinates <- c(Plotting_SGP_Scale_Score_Targets[[i]][['NY1']], 
 						as.numeric(convertY(convertY(unit(Plotting_SGP_Scale_Score_Targets[[i]][['NY1']], "native"), "inches")-unit(0.1, "inches"), "native"))) 
 		}
 		if (length(grep("MUSU", i))>0 & tmp.achievement.level <= level.to.get.musu) {
 			label.position <- c(label.position, "bottom")
-			tmp.target.label <- c("Move Up", "Target")
+			tmp.target.label <- c(MU.label, target.label)
 			y.coordinates <- c(as.numeric(convertY(convertY(unit(Plotting_SGP_Scale_Score_Targets[[i]][['NY1']], "native"), "inches")+unit(0.1, "inches"), "native")), 
 						Plotting_SGP_Scale_Score_Targets[[i]][['NY1']]) 
 		}
 		if (length(grep("MUSU", i))>0 & tmp.achievement.level > level.to.get.musu) {
 			label.position <- c(label.position, "bottom")
-			tmp.target.label <- c("Stay Up", "Target")
+			tmp.target.label <- c(SU.label, target.label)
 			y.coordinates <- c(as.numeric(convertY(convertY(unit(Plotting_SGP_Scale_Score_Targets[[i]][['NY1']], "native"), "inches")+unit(0.1, "inches"), "native")), 
 						Plotting_SGP_Scale_Score_Targets[[i]][['NY1']]) 
 		}
@@ -650,7 +724,7 @@ grid.lines(0, c(yscale.range[1], yscale.range[2]), gp=gpar(lwd=.8, col=border.co
 
 popViewport()
 
-pushViewport(growth.and.left.vp)
+pushViewport(growth.and.margins.vp)
 if (grade.values$year_span == 0) {grid.roundrect(r=unit(.01, "snpc"), gp=gpar(lwd=1.8, col=border.color, clip=TRUE, fill=rgb(1, 1, 1, 0.5)))}
 else {grid.roundrect(r=unit(.01, "snpc"), gp=gpar(lwd=1.8, col=border.color, clip=TRUE))}
 popViewport()
@@ -699,7 +773,7 @@ if (is.null(Report_Parameters[['SGP_Targets']])) {
 				paste(level.to.get.cuku.label, " (", SGP_Scale_Score_Targets[[grep("CUKU", tmp.projection.names, value=TRUE)]][['NY1']], ")", sep=""),
 				gp=gpar(col=border.color, cex=.4), default.units="native")
 			grid.text(x=tmp.projection.year, y=0.25, 
-				paste("Catch Up (", SGP_Targets[[grep("CUKU", tmp.projection.names, value=TRUE)]], ")", sep=""),
+				paste(CU.label, " (", SGP_Targets[[grep("CUKU", tmp.projection.names, value=TRUE)]], ")", sep=""),
 				gp=gpar(col=border.color, cex=.4), default.units="native")
 		} else {
 			level.to.get.cuku.label <- names(achievement.level.labels)[level.to.get.cuku+1]
@@ -709,12 +783,12 @@ if (is.null(Report_Parameters[['SGP_Targets']])) {
 				gp=gpar(col=border.color, cex=.4), default.units="native")
 			if (tmp.achievement.level <= level.to.get.musu) {
 				grid.text(x=tmp.projection.year, y=0.25, 
-				paste("Keep Up (", SGP_Targets[[grep('CUKU', tmp.projection.names, value=TRUE)]], ")/Move Up (", SGP_Targets[[grep('MUSU', tmp.projection.names, value=TRUE)]], ")", sep=""),
+				paste(KU.label, " (", SGP_Targets[[grep('CUKU', tmp.projection.names, value=TRUE)]], ")/Move Up (", SGP_Targets[[grep('MUSU', tmp.projection.names, value=TRUE)]], ")", sep=""),
 				gp=gpar(col=border.color, cex=.4), default.units="native")
 			}
 			if (tmp.achievement.level > level.to.get.musu) {
 				grid.text(x=tmp.projection.year, y=0.25, 
-				paste("Keep Up (", SGP_Targets[[grep('CUKU', tmp.projection.names, value=TRUE)]], ")/Stay Up (", SGP_Targets[[grep('MUSU', tmp.projection.names, value=TRUE)]], ")", sep=""),
+				paste(KU.label, " (", SGP_Targets[[grep('CUKU', tmp.projection.names, value=TRUE)]], ")/Stay Up (", SGP_Targets[[grep('MUSU', tmp.projection.names, value=TRUE)]], ")", sep=""),
 				gp=gpar(col=border.color, cex=.4), default.units="native")
 			}
 		}
@@ -740,11 +814,11 @@ popViewport()
 
 pushViewport(bottom.right.vp)
 if (is.null(Report_Parameters[['SGP_Targets']])) {
-	grid.text(x=0.1, y=1.5, "Achievement", gp=gpar(col=border.color, cex=1.2), just="left", default.units="native")
-	grid.text(x=0.1, y=.5, "Growth", gp=gpar(col=border.color, cex=1.2), just="left", default.units="native")
+	grid.text(x=0.1, y=1.5, achievement.label, gp=gpar(col=border.color, cex= bottom.right.vp.size), just="left", default.units="native")
+	grid.text(x=0.1, y=.5, growth.label, gp=gpar(col=border.color, cex= bottom.right.vp.size), just="left", default.units="native")
 } else {
-	grid.text(x=0.1, y=1.65, "Achievement", gp=gpar(col=border.color, cex=1.3), just="left", default.units="native")
-	grid.text(x=0.1, y=0.55, "Growth", gp=gpar(col=border.color, cex=1.3), just="left", default.units="native")
+	grid.text(x=0.1, y=1.65, achievement.label, gp=gpar(col=border.color, cex= bottom.right.vp.size+0.1), just="left", default.units="native")
+	grid.text(x=0.1, y=0.55, growth.label, gp=gpar(col=border.color, cex= bottom.right.vp.size+0.1), just="left", default.units="native")
 }
 popViewport()
 
@@ -753,68 +827,86 @@ popViewport()
 
 pushViewport(bottom.left.vp)
 if (is.null(Report_Parameters[['SGP_Targets']])) {
-	grid.text(x=0.9, y=1.7, "Scale Score", gp=gpar(col=border.color, cex=.7), just="right", default.units="native")
-	grid.text(x=0.9, y=1.3, "Achievement Level", gp=gpar(col=border.color, cex=.7), just="right", default.units="native")
-	grid.text(x=0.9, y=0.7, "Growth Percentile", gp=gpar(col=border.color, cex=.7), just="right", default.units="native")
-	grid.text(x=0.9, y=0.3, "Growth Level", gp=gpar(col=border.color, cex=.7), just="right", default.units="native")
+	grid.text(x=0.9, y=1.7, scale_score.label, gp=gpar(col=border.color, cex=bottom.left.vp.size), just="right", default.units="native")
+	grid.text(x=0.9, y=1.3, achievement_level.label, gp=gpar(col=border.color, cex=bottom.left.vp.size), just="right", default.units="native")
+	grid.text(x=0.9, y=0.7, growth_percentile.label, gp=gpar(col=border.color, cex=bottom.left.vp.size), just="right", default.units="native")
+	grid.text(x=0.9, y=0.3, growth_level.label, gp=gpar(col=border.color, cex=bottom.left.vp.size), just="right", default.units="native")
 } else {
-	grid.text(x=0.9, y=1.95, "Scale Score", gp=gpar(col=border.color, cex=.575), just="right", default.units="native")
-	grid.text(x=0.9, y=1.65, "Achievement Level", gp=gpar(col=border.color, cex=.575), just="right", default.units="native")
-	grid.text(x=0.9, y=1.35, "Achievement Target", gp=gpar(col=border.color, cex=.575), just="right", default.units="native")
-	grid.text(x=0.9, y=0.85, "Growth Percentile", gp=gpar(col=border.color, cex=.575), just="right", default.units="native")
-	grid.text(x=0.9, y=0.55, "Growth Level", gp=gpar(col=border.color, cex=.575), just="right", default.units="native")
-	grid.text(x=0.9, y=0.25, "Growth Target", gp=gpar(col=border.color, cex=.575), just="right", default.units="native")
+	grid.text(x=0.9, y=1.95, scale_score.label, gp=gpar(col=border.color, cex=bottom.left.vp.size-0.125), just="right", default.units="native")
+	grid.text(x=0.9, y=1.65, achievement_level.label, gp=gpar(col=border.color, cex=bottom.left.vp.size-0.125), just="right", default.units="native")
+	grid.text(x=0.9, y=1.35, achievement_target.label, gp=gpar(col=border.color, cex=bottom.left.vp.size-0.125), just="right", default.units="native")
+	grid.text(x=0.9, y=0.85, growth_percentile.label, gp=gpar(col=border.color, cex=bottom.left.vp.size-0.125), just="right", default.units="native")
+	grid.text(x=0.9, y=0.55, growth_level.label, gp=gpar(col=border.color, cex=bottom.left.vp.size-0.125), just="right", default.units="native")
+	grid.text(x=0.9, y=0.25, growth_target.label, gp=gpar(col=border.color, cex=bottom.left.vp.size-0.125), just="right", default.units="native")
 }
 popViewport()
 
 
 ### Right Viewport
 
+if (is.null(Report_Parameters$Assessment_Transition)) { ### right.vp without ASSESSMENT_TRANSITION
+	pushViewport(right.vp)
+
+	grid.roundrect(width=unit(0.95, "native"), r=unit(.02, "snpc"), gp=gpar(lwd=1.8, col=border.color, fill=legend.fill.color), just="center")
+
+	if (!split.content_area.tf) {
+		grid.text(x=.5, y=0.875, content.area.label, gp=gpar(col=border.color, cex=title.ca.size, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native")
+	} else {
+		grid.text(x=.5, y=0.92, content_area.label.pieces[1], gp=gpar(col=border.color, cex=title.ca.size-0.25, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native")
+		grid.text(x=.5, y=0.83, content_area.label.pieces[2], gp=gpar(col=border.color, cex= title.ca.size-0.25, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native")	
+	}
+	grid.text(x=0.08, y=0.75, achievement.label, gp=gpar(col=border.color, cex=.85, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native", just="left")
+	grid.text(x=0.08, y=0.525, growth.label, gp=gpar(col=border.color, cex=.75, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native", just="left")
+	grid.text(x=0.275, y=0.455, level.label, gp=gpar(col=border.color, cex=.6), default.units="native", just="center")
+	grid.text(x=0.75, y=0.455, percentiles.label, gp=gpar(col=border.color, cex=.6), default.units="native", just="center")
+
+	grid.roundrect(x=unit(0.3, "native"), y=unit(0.64, "native"), width=unit(0.3, "native"), height=unit(0.1, "native"), r=unit(0.06, "char"), 
+		gp=gpar(col="grey72", lwd=0.4, fill="grey72"))
+	grid.circle(x=0.3, y=0.64, r=unit(0.04, "inches"), gp=gpar(col=border.color, lwd=0.7, fill="white"), default.units="native") 
+	if (!split.content_area.tf) {
+		grid.text(x=0.7, y=0.658, paste(test.abbreviation, content.area.label), gp=gpar(col=border.color, cex=legend.size), default.units="native")
+		grid.text(x=0.7, y=0.622, scale_score.label, gp=gpar(col=border.color, cex= legend.size), default.units="native")
+	} else {
+		grid.text(x=0.7, y=0.7, test.abbreviation, gp=gpar(col=border.color, cex=legend.size), default.units="native")
+		grid.text(x=0.7, y=0.665, content_area.label.pieces[1], gp=gpar(col=border.color, cex=legend.size), default.units="native")
+		grid.text(x=0.7, y=0.63, content_area.label.pieces[2], gp=gpar(col=border.color, cex=legend.size), default.units="native")
+		grid.text(x=0.7, y=0.595, scale_score.label, gp=gpar(col=border.color, cex= legend.size), default.units="native")
+	}
+
+	y.center <- seq(0.05, 0.4, length=number.growth.levels+1)
+	arrow.legend.coors.x <- c(.25, .75, .75, 1, .5, 0, .25)
+	arrow.legend.coors.y <- c(0, 0, 1.3, 1.1, 2, 1.1, 1.3)
+
+	for (i in seq(number.growth.levels)) {
+		pushViewport(viewport(x=unit(0.3, "native"), y=unit(y.center[i], "native"), 
+			width=unit(0.07, "native"), height=unit(y.center[2]-y.center[1], "npc"), just=c("center", "bottom"),
+			xscale=c(0, 1), yscale=c(0, 2)))
+		grid.polygon(x=arrow.legend.coors.x, y=arrow.legend.coors.y, default.units="native", 
+			gp=gpar(lwd=0.3, col=border.color, fill=arrow.legend.color[i]))
+
+		popViewport()
+
+		pushViewport(viewport(x=unit(0.2, "native"), y=unit(y.center[i], "native"),
+			width=unit(0.04, "native"), height=unit(y.center[2]-y.center[1], "npc"), just=c("center", "bottom")))
+			grid.roundrect(x=0.5, y=0.5, width=1, height=1, r=unit(.45, "snpc"), 
+			gp=gpar(lwd=0.3, col=border.color, fill=arrow.legend.color[i]))
+		popViewport()
+
+		grid.polygon(x=c(0.05, rep(0.1875, 2)),
+			y=c((head(y.center,1)+tail(y.center,1))/2, y.center[i], y.center[i]+y.center[2]-y.center[1]), default.units="native", 
+			gp=gpar(col=NA, lwd=0, fill=arrow.legend.color[i], alpha=0.45)) 
+
+		grid.text(x=0.375, y=((y.center[1]+y.center[2])/2)+(i-1)*(y.center[2]-y.center[1]), growth.level.labels[i], default.units="native", 
+			gp=gpar(col=border.color, cex=.5), just="left")
+		grid.text(x=0.925, y=((y.center[1]+y.center[2])/2)+(i-1)*(y.center[2]-y.center[1]), growth.level.cutscores.text[i], default.units="native", 
+			gp=gpar(col=border.color, cex=.5), just="right")
+	}
+} else { ### right.vp with ASSESSMENT_TRANSITION
 pushViewport(right.vp)
 
-grid.roundrect(width=unit(0.95, "native"), r=unit(.02, "snpc"), gp=gpar(lwd=1.8, col=border.color, fill=legend.fill.color), just="center")
 
-grid.text(x=.5, y=.875, content.area.label, gp=gpar(col=border.color, cex=1.8, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native")
-grid.text(x=0.08, y=0.75, "Achievement", gp=gpar(col=border.color, cex=.85, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native", just="left")
-grid.text(x=0.08, y=0.525, "Growth", gp=gpar(col=border.color, cex=.75, fontface=2, fontfamily="Helvetica-Narrow"), default.units="native", just="left")
-grid.text(x=0.275, y=0.455, "Level", gp=gpar(col=border.color, cex=.6), default.units="native", just="center")
-grid.text(x=0.75, y=0.455, "Percentiles", gp=gpar(col=border.color, cex=.6), default.units="native", just="center")
 
-grid.roundrect(x=unit(0.3, "native"), y=unit(0.64, "native"), width=unit(0.3, "native"), height=unit(0.1, "native"), r=unit(0.06, "char"), 
-               gp=gpar(col="grey72", lwd=0.4, fill="grey72"))
-grid.circle(x=0.3, y=0.64, r=unit(0.04, "inches"), gp=gpar(col=border.color, lwd=0.7, fill="white"), default.units="native") 
-grid.text(x=0.7, y=0.658, paste(test.abbreviation, content.area.label), gp=gpar(col=border.color, cex=.5), default.units="native")
-grid.text(x=0.7, y=0.622, "Scale Score", gp=gpar(col=border.color, cex=.5), default.units="native")
-
-y.center <- seq(0.05, 0.4, length=number.growth.levels+1)
-arrow.legend.coors.x <- c(.25, .75, .75, 1, .5, 0, .25)
-arrow.legend.coors.y <- c(0, 0, 1.3, 1.1, 2, 1.1, 1.3)
-
-for (i in seq(number.growth.levels)) {
-   pushViewport(viewport(x=unit(0.3, "native"), y=unit(y.center[i], "native"), 
-                width=unit(0.07, "native"), height=unit(y.center[2]-y.center[1], "npc"), just=c("center", "bottom"),
-                xscale=c(0, 1), yscale=c(0, 2)))
-   grid.polygon(x=arrow.legend.coors.x, y=arrow.legend.coors.y, default.units="native", 
-                gp=gpar(lwd=0.3, col=border.color, fill=arrow.legend.color[i]))
-
-   popViewport()
-
-   pushViewport(viewport(x=unit(0.2, "native"), y=unit(y.center[i], "native"),
-                width=unit(0.04, "native"), height=unit(y.center[2]-y.center[1], "npc"), just=c("center", "bottom")))
-   grid.roundrect(x=0.5, y=0.5, width=1, height=1, r=unit(.45, "snpc"), 
-                  gp=gpar(lwd=0.3, col=border.color, fill=arrow.legend.color[i]))
-   popViewport()
-
-   grid.polygon(x=c(0.05, rep(0.1875, 2)),
-                y=c((head(y.center,1)+tail(y.center,1))/2, y.center[i], y.center[i]+y.center[2]-y.center[1]), default.units="native", 
-                gp=gpar(col=NA, lwd=0, fill=arrow.legend.color[i], alpha=0.45)) 
-
-   grid.text(x=0.375, y=((y.center[1]+y.center[2])/2)+(i-1)*(y.center[2]-y.center[1]), growth.level.labels[i], default.units="native", 
-             gp=gpar(col=border.color, cex=.5), just="left")
-   grid.text(x=0.925, y=((y.center[1]+y.center[2])/2)+(i-1)*(y.center[2]-y.center[1]), growth.level.cutscores.text[i], default.units="native", 
-             gp=gpar(col=border.color, cex=.5), just="right")
 }
-
 popViewport(2)
 
 } ## END studentGrowthPlot Function
